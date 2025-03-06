@@ -15,28 +15,11 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { Field } from "@/components/ui/field";
-import {
-  useForm,
-  SubmitHandler,
-  useFieldArray,
-  Controller,
-} from "react-hook-form";
-
-import {
-  DrawerActionTrigger,
-  DrawerBackdrop,
-  DrawerBody,
-  DrawerCloseTrigger,
-  DrawerContent,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerRoot,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
+import { useForm, SubmitHandler } from "react-hook-form";
 
 import ExpenseForm from "@/app/components/ExpenseForm";
 import ParticipantForm from "@/app/components/ParticipantForm";
+import SplitResult from "@/app/components/SplitResult";
 import { Participant, Expense, SplitDetail } from "@/app/types/interfaces";
 
 interface BillFormInput {
@@ -76,34 +59,8 @@ const defaultExpense: Expense = {
   splitDetails: [],
 };
 
-// const defaultSplitDetail: SplitDetail = {
-//   id: "",
-//   expense: defaultExpense,
-//   participant: defaultParticipant,
-//   amount: 0,
-// };
-
 export default function BillForm() {
-  const { register, control, handleSubmit, watch, reset } =
-    useForm<BillFormInput>();
-  const {
-    fields: participantFields,
-    append: appendParticipant,
-    update: updateParticipant,
-    remove: removeParticipant,
-  } = useFieldArray({
-    control,
-    name: "participants",
-  });
-  const {
-    fields: expenseFields,
-    append: appendExpense,
-    update: updateExpense,
-    remove: removeExpense,
-  } = useFieldArray({
-    control,
-    name: "expenses",
-  });
+  const { register, control, handleSubmit, reset } = useForm<BillFormInput>();
 
   const [openParticipantForm, setOpenParticipantForm] = useState(false);
   const [openExpenseForm, setOpenExpenseForm] = useState(false);
@@ -117,18 +74,12 @@ export default function BillForm() {
 
   const [splitDetails, setSplitDetails] = useState<SplitDetail[]>([]);
 
-  const watchParticipants = watch("participants");
-  const watchExpenses = watch("expenses");
+  const [creditors, setCreditors] = useState<Participant[]>([]);
+  const [debtors, setDebtors] = useState<Participant[]>([]);
 
-  // const handleParticipantChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  //   const { name, value } = e.target;
-  //   setParticipant({ ...participant, [name]: value });
-  // };
-
-  // if participants change (i.e. one person who's splitting is removed), update expense accordingly
   useEffect(() => {
-    // all expenses that have that person will have to be updated
-  }, [watchParticipants]);
+    console.log("Expenses state updated!", expenses);
+  }, [expenses]);
 
   const onSubmit: SubmitHandler<BillFormInput> = (data) => {
     console.log(data);
@@ -153,163 +104,154 @@ export default function BillForm() {
     setSelectedExpense(expense);
     setOpenExpenseForm(true);
   };
+
+  const handleSplit = () => {
+    // For each participant:
+    //    calculate the total amount paid
+    //    calculate the total amount split
+    //    calculate the balance
+    //       if balance > 0, add to creditors[]
+    //       if balance < 0, add to debtors[]
+    //       if balance = 0, do nothing
+    //
+    // Get sum of creditors and debtors:
+    //    if sum of creditors = sum of debtors, proceed to split
+    //    if sum of creditors !== sum of debtors, generate error
+    //
+    // Split:
+    //    sort creditor[] descending, debtor[] ascending by balance
+    //    loop through creditors and debtors
+    //       const balance = creditor.balance - debtor.balance
+    //       if balance > 0
+    //          => debtor is settled, create transaction for debtor.balance
+    //          => update creditor.balance = balance
+    //          => update debtor.balance = 0
+    //          => creditor[i] stays the same, move to the next debtor[j+1]
+    //       if balance < 0
+    //          => creditor is settled (no need transaction)
+    //          => update creditor.balance = 0
+    //          => update debtor.balance = balance
+    //          => debtor[j] stays the same, move to the next creditor[i+1]
+    //       if balance = 0
+    //          => creditor and debtor are settled, create transaction for debtor.balance
+    //          => update creditor.balance = 0
+    //          => update debtor.balance = 0
+    console.log("Expenses", expenses);
+    console.log("Participants", participants);
+  };
+
   return (
-    <Flex align="center" justify="center" direction="column">
-      <Heading>New Expense Group</Heading>
+    <Flex align="center" justify="center" direction="column" minH={"100vh"}>
+      <Heading py={6}>New Expense Group</Heading>
       <form onSubmit={handleSubmit(onSubmit)}>
-        <Field label="Title">
-          <Input {...register("title")}></Input>
-        </Field>
-        <Field label="Note">
-          <Textarea {...register("note")}></Textarea>
-        </Field>
-        <Field label="Participants">
-          <Flex align="center" justify="center">
-            <ul>
-              <Flex>
-                {participants.length > 0 &&
-                  participants.map((participant) => {
-                    return (
-                      <li key={participant.id}>
-                        <Button
-                          variant="plain"
-                          p="0"
-                          minW="auto"
-                          onClick={() => {
-                            handleUpdateParticipant(participant);
-                          }}
-                        >
-                          <Avatar.Root
-                            key={participant.id}
-                            variant="subtle"
-                            size="lg"
-                          >
-                            <Avatar.Fallback
-                              name={`${participant.firstName} ${participant.lastName}`}
-                            />
-                          </Avatar.Root>
-                        </Button>
-                      </li>
-                    );
-                  })}
-              </Flex>
-            </ul>
-            <Button
-              variant="plain"
-              p="0"
-              minW="auto"
-              onClick={() => handleNewParticipant()}
-            >
-              <Avatar.Root variant="solid" size="lg">
-                <Avatar.Fallback name="+" />
-              </Avatar.Root>
-            </Button>
-          </Flex>
-        </Field>
-        <Field label="Expenses">
-          <ul>
-            <Flex>
-              {expenses.length > 0 &&
-                expenses.map((expense) => {
-                  console.log("expense item", expense);
-                  return (
-                    <li key={expense.id}>
-                      <Button
-                        variant="subtle"
-                        p="0"
-                        size="lg"
-                        onClick={() => {
-                          handleUpdateExpense(expense);
-                        }}
-                      >
-                        {expense.title}
-                      </Button>
-                      {/* Update Expense - Start */}
-                      {/* <DrawerRoot placement="bottom">
-                      <DrawerBackdrop />
-                      <DrawerTrigger asChild>
-                        <Button variant="subtle" p="0" size="lg">
-                          {item.title}
-                        </Button>
-                      </DrawerTrigger>
-                      <DrawerContent roundedTop="l3">
-                        <DrawerHeader>
-                          <DrawerTitle>{item.title}</DrawerTitle>
-                        </DrawerHeader>
-                        <DrawerBody>
-                          <Text>Split By:</Text>
-                          {item.splitBy.map((p) => (
-                            <Text key={p}>{p}</Text>
-                          ))} */}
-                      {/* <Field label="First Name">
-                            <Input
-                              {...register(`participants.${index}.firstName`, {
-                                required: true,
-                              })}
-                            />
-                          </Field> */}
-                      {/* no need to use controller?  */}
-                      {/* <Controller
-                            render={({ field }) => (
-                              <Field label="Last Name">
-                                <Input {...field} />
-                              </Field>
-                            )}
-                            name={`participants.${index}.lastName`}
-                            control={control}
-                          /> */}
-                      {/* <Button
-                            type="button"
-                            onClick={() => removeExpense(index)}
-                          >
-                            Delete
-                          </Button>
-                        </DrawerBody>
-                        <DrawerFooter>
-                          <DrawerActionTrigger asChild>
-                            <Button variant="outline">Cancel</Button>
-                          </DrawerActionTrigger>
+        <Flex align="center" direction="column" gap={6} minH={"100vh"}>
+          <Field label="Title">
+            <Input {...register("title")}></Input>
+          </Field>
+          <Field label="Note">
+            <Textarea {...register("note")}></Textarea>
+          </Field>
+          <Field label="Participants">
+            <Flex align="center" justify="center">
+              <ul>
+                <Flex>
+                  {participants.length > 0 &&
+                    participants.map((participant) => {
+                      return (
+                        <li key={participant.id}>
                           <Button
+                            variant="plain"
+                            p="0"
+                            minW="auto"
                             onClick={() => {
-                              console.log("updating expense item", item);
-                              updateExpense(index, watchExpenses[index]);
+                              handleUpdateParticipant(participant);
                             }}
                           >
-                            Save
+                            <Avatar.Root
+                              key={participant.id}
+                              variant="subtle"
+                              size="lg"
+                            >
+                              <Avatar.Fallback
+                                name={`${participant.firstName} ${participant.lastName}`}
+                              />
+                            </Avatar.Root>
                           </Button>
-                        </DrawerFooter>
-                        <DrawerCloseTrigger />
-                      </DrawerContent>
-                    </DrawerRoot> */}
-                    </li>
-                  );
-                })}
+                        </li>
+                      );
+                    })}
+                </Flex>
+              </ul>
               <Button
                 variant="plain"
                 p="0"
                 minW="auto"
-                onClick={() => {
-                  handleNewExpense();
-                }}
+                onClick={() => handleNewParticipant()}
               >
                 <Avatar.Root variant="solid" size="lg">
                   <Avatar.Fallback name="+" />
                 </Avatar.Root>
               </Button>
             </Flex>
-          </ul>
-        </Field>
+          </Field>
+          <Field label="Expenses">
+            <ul>
+              <Flex justify="center" align="start" direction="column" gap={6}>
+                {expenses.length > 0 &&
+                  expenses.map((expense) => {
+                    console.log("expense item", expense);
+                    return (
+                      <li key={expense.id}>
+                        <Button
+                          variant="subtle"
+                          p="0"
+                          size="lg"
+                          onClick={() => {
+                            handleUpdateExpense(expense);
+                          }}
+                        >
+                          {expense.title}
+                        </Button>
+                      </li>
+                    );
+                  })}
+                {participants.length > 0 ? (
+                  <Button
+                    variant="plain"
+                    p="0"
+                    minW="auto"
+                    onClick={() => {
+                      handleNewExpense();
+                    }}
+                  >
+                    <Avatar.Root variant="solid" size="lg">
+                      <Avatar.Fallback name="+" />
+                    </Avatar.Root>
+                  </Button>
+                ) : (
+                  <Text>No participants added yet</Text>
+                )}
+              </Flex>
+            </ul>
+          </Field>
 
-        <Button type="submit" bgColor="lime.500">
-          Split
-        </Button>
+          <Button type="submit" bgColor="lime.500">
+            Split
+          </Button>
+        </Flex>
       </form>
+      <SplitResult />
+
       {openParticipantForm && (
         <ParticipantForm
           setParticipants={setParticipants}
           openParticipantForm={openParticipantForm}
           setOpenParticipantForm={setOpenParticipantForm}
           participant={selectedParticipant}
+          setExpenses={setExpenses}
+          splitDetails={splitDetails}
+          setSplitDetails={setSplitDetails}
+          expenses={expenses}
         />
       )}
       {openExpenseForm && (
@@ -321,6 +263,7 @@ export default function BillForm() {
           participants={participants}
           setSplitDetails={setSplitDetails}
           splitDetails={splitDetails}
+          setParticipants={setParticipants}
         />
       )}
     </Flex>

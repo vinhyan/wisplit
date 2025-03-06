@@ -16,7 +16,7 @@ import {
   createListCollection,
 } from "@chakra-ui/react";
 import { Field } from "@/components/ui/field";
-import { useForm, SubmitHandler, Controller } from "react-hook-form";
+import { useForm, SubmitHandler, Controller, set } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
 import {
   DrawerActionTrigger,
@@ -28,7 +28,6 @@ import {
   DrawerHeader,
   DrawerRoot,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
 
 import {
@@ -37,6 +36,7 @@ import {
 } from "@/components/ui/number-input";
 
 import { Participant, Expense, SplitDetail } from "../types/interfaces";
+import { WiDayHail } from "react-icons/wi";
 
 interface ExpenseFormProps {
   participants: Participant[];
@@ -46,23 +46,8 @@ interface ExpenseFormProps {
   expense: Expense;
   setSplitDetails: React.Dispatch<React.SetStateAction<SplitDetail[]>>;
   splitDetails: SplitDetail[];
+  setParticipants: React.Dispatch<React.SetStateAction<Participant[]>>;
 }
-
-// interface ExpenseFormInput {
-//   title: string;
-//   note: string;
-//   cost: number;
-//   paidBy: string; // participant id
-//   splitDetail: string[];
-// }
-
-// const defaultExpenseValues: ExpenseFormInput = {
-//   title: "",
-//   note: "",
-//   cost: 0,
-//   paidBy: "",
-//   splitDetail: [],
-// };
 
 export default function ExpenseForm({
   participants,
@@ -72,24 +57,25 @@ export default function ExpenseForm({
   setOpenExpenseForm,
   setSplitDetails,
   splitDetails,
+  setParticipants,
 }: ExpenseFormProps) {
   const { register, control, handleSubmit, watch, reset, setValue } =
     useForm<Expense>({
       defaultValues: expense,
     });
-  const [selectedSplitParticipants, setSelectedSplitParticipants] = useState<
-    string[]
-  >([]);
 
   useEffect(() => {
+    // if updating expense, convert splitDetails to participant ids
+    // to be used in the form
     if (expense.id) {
-      const splitParticipants = splitDetails.map(
+      const splitByParticipants = splitDetails.map(
         (splitDetail) => splitDetail.participant
       );
-      setValue("splitDetails", splitParticipants);
+      setValue("splitDetails", splitByParticipants);
     }
   }, [expense, splitDetails, setValue]);
 
+  // options for paidBy select
   const participantsCollection = useMemo(() => {
     return createListCollection({
       items: participants.map((participant) => ({
@@ -100,6 +86,7 @@ export default function ExpenseForm({
     });
   }, [participants]);
 
+  // options for splitBy checkbox
   const splitByParticipants = useMemo(() => {
     const result = participants.map((participant) => ({
       label: `${participant.firstName} ${participant.lastName}`,
@@ -119,36 +106,105 @@ export default function ExpenseForm({
     setValue("splitDetails", updatedValues);
   };
 
-  const onSubmit: SubmitHandler<Expense> = (data) => {
-    // new expense
-    if (data.id.length === 0) {
-      data.id = uuidv4();
+  const handleDeleteExpense = () => {
+    const updatedParticipants: Participant[] = [];
 
-      // the form uses participant ids, so we need to convert them to splitDetails
-      const splitDetails: SplitDetail[] = data.splitDetails.map(
-        (participantId) => {
-          const participant = participants.find(
-            (participant) => participant.id === participantId
-          );
-          if (!participant) {
-            throw new Error(`Participant with id ${participantId} not found`);
-          }
-          return {
-            id: uuidv4(),
-            expense: data.id,
-            participant: participant.id,
-            amount: data.cost / data.splitDetails.length,
-          };
-        }
+    for (let i = 0; i < participants.length; i++) {
+      const participant = participants[i];
+      // paidBy
+      if (participant.id === expense.paidBy) {
+        // remove paidExpense
+        const updatedPaidExpense = participant.paidExpense.filter(
+          (pe) => pe !== expense.id
+        );
+        participant.paidExpense = updatedPaidExpense;
+      }
+
+      // remove splitBy
+      const updatedSplitDetails = participant.splitDetails.filter(
+        (sdId) => !expense.splitDetails.includes(sdId)
       );
+      participant.splitDetails = updatedSplitDetails;
+      updatedParticipants.push(participant);
+    }
+    // remove and update splitDetails
+    setSplitDetails((prev) => prev.filter((sd) => sd.expense !== expense.id));
 
-      data.splitDetails = splitDetails.map((splitDetail) => splitDetail.id);
+    // update participants
+    setParticipants(updatedParticipants);
+
+    // remove and update expense
+    setExpenses((prev) => prev.filter((e) => e.id !== expense.id));
+  };
+
+  const onSubmit: SubmitHandler<Expense> = (data) => {
+    if (data.id.length) {
+      // if updating expense
+      // remove current splitDetails
+      setSplitDetails((prev) => prev.filter((sd) => sd.expense !== data.id));
     } else {
-      
+      data.id = uuidv4();
     }
 
+    // paidBy participant Id
+    data.paidBy = data.paidBy[0];
+
+    // the form uses participant ids, so we need to convert them to splitDetails
+    const splitDetails: SplitDetail[] = data.splitDetails.map(
+      (participantId) => {
+        const participant = participants.find(
+          (participant) => participant.id === participantId
+        );
+        if (!participant) {
+          throw new Error(`Participant with id ${participantId} not found`);
+        }
+        return {
+          id: uuidv4(),
+          expense: data.id,
+          participant: participant.id,
+          amount: data.cost / data.splitDetails.length,
+        };
+      }
+    );
+
+    data.splitDetails = splitDetails.map((splitDetail) => splitDetail.id);
+
+    let updatedParticipants = participants.map((participant) => {
+      // loop through splitDetails, if participant.id === splitDetail.participant
+      // add splitDetail.id to participant.splitDetails
+      let matchSplitDetailId = "";
+
+      for (let i = 0; i < splitDetails.length; i++) {
+        const splitDetail = splitDetails[i];
+        if (splitDetail.participant === participant.id) {
+          matchSplitDetailId = splitDetail.id;
+          break;
+        }
+      }
+      console.log("participant.splitDetails", participant.splitDetails);
+      // participant.splitDetails.push(matchSplitDetailId);
+      return participant;
+    });
+
     setSplitDetails((prev) => [...prev, ...splitDetails]);
-    setExpenses((prev) => [...prev, data]);
+
+    // updating expense
+    if (expense.id.length) {
+      setExpenses((prev) => prev.map((e) => (e.id === data.id ? data : e)));
+    }
+    // new expense
+    else {
+      // add paidExpense to the paidBy participant
+      updatedParticipants = updatedParticipants.map((participant) => {
+        if (participant.id === data.paidBy) {
+          participant.paidExpense.push(data.id);
+        }
+        return participant;
+      });
+      setParticipants(updatedParticipants);
+      setExpenses((prev) => [...prev, data]);
+    }
+
     reset();
     setOpenExpenseForm(false);
   };
@@ -161,13 +217,6 @@ export default function ExpenseForm({
       lazyMount
     >
       <DrawerBackdrop />
-      {/* <DrawerTrigger asChild>
-        <Button variant="plain" p="0" minW="auto">
-          <Avatar.Root variant="solid" size="lg">
-            <Avatar.Fallback name="+" />
-          </Avatar.Root>
-        </Button>
-      </DrawerTrigger> */}
       <DrawerContent roundedTop="l3">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DrawerHeader>
@@ -199,6 +248,7 @@ export default function ExpenseForm({
                       size="lg"
                       closeOnSelect
                       positioning={{ placement: "top", flip: false }}
+                      defaultValue={[expense.paidBy]}
                     >
                       <SelectTrigger>
                         <SelectValueText placeholder="Paid by" />
@@ -265,6 +315,15 @@ export default function ExpenseForm({
                 <Text>No participants</Text>
               )}
             </Field>
+            {expense.id.length > 0 && (
+              <Button
+                onClick={handleDeleteExpense}
+                variant="outline"
+                colorPalette="red"
+              >
+                Delete
+              </Button>
+            )}
           </DrawerBody>
           <DrawerFooter>
             <DrawerActionTrigger asChild>

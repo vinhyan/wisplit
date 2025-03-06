@@ -4,7 +4,7 @@
 import { v4 as uuidv4 } from "uuid";
 import { Input, Button } from "@chakra-ui/react";
 import { Field } from "@/components/ui/field";
-import { useForm, SubmitHandler } from "react-hook-form";
+import { useForm, SubmitHandler, set } from "react-hook-form";
 
 import { Avatar } from "@chakra-ui/react";
 
@@ -20,13 +20,17 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 
-import { Participant } from "@/app/types/interfaces";
+import { Participant, Expense, SplitDetail } from "@/app/types/interfaces";
 
 interface ParticipantFormProps {
   openParticipantForm: boolean;
   setParticipants: React.Dispatch<React.SetStateAction<Participant[]>>;
   setOpenParticipantForm: React.Dispatch<React.SetStateAction<boolean>>;
   participant: Participant;
+  expenses: Expense[];
+  setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
+  splitDetails: SplitDetail[];
+  setSplitDetails: React.Dispatch<React.SetStateAction<SplitDetail[]>>;
 }
 
 export default function ParticipantForm({
@@ -34,6 +38,10 @@ export default function ParticipantForm({
   openParticipantForm,
   setOpenParticipantForm,
   participant,
+  expenses,
+  setExpenses,
+  splitDetails,
+  setSplitDetails,
 }: ParticipantFormProps) {
   const { register, handleSubmit, reset } = useForm<Participant>({
     defaultValues: {
@@ -44,6 +52,11 @@ export default function ParticipantForm({
   });
 
   const onSubmit: SubmitHandler<Participant> = (data) => {
+    // need to create a new participant object and save data from the form to it, cannot use just data because it only has first and last name, the other properties are missing
+    const newParticipant = {
+      ...participant,
+      ...data,
+    }
     // update participant
     console.log("2. SUBMIT PARTICIPANT");
     if (participant.id.length) {
@@ -60,10 +73,26 @@ export default function ParticipantForm({
 
   const handleDeleteParticipant = () => {
     if (participant.id.length) {
+      // delete split details
+      setSplitDetails((prev) => {
+        return prev.filter((sd) => sd.participant !== participant.id);
+      });
+      // delete expense
+      setExpenses((prev) => {
+        console.log("prev expenses", prev);
+        const updatedExpenses = prev.filter((e) => e.paidBy !== participant.id);
+        console.log("updated expenses", updatedExpenses);
+        return updatedExpenses;
+      });
+
+      // delete transactions
+
+      // delete participant
       setParticipants((prev) => {
         return prev.filter((p) => p.id !== participant.id);
       });
     }
+    reset();
     setOpenParticipantForm(false);
   };
 
