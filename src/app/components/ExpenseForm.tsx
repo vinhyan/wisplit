@@ -35,8 +35,13 @@ import {
   NumberInputRoot,
 } from "@/components/ui/number-input";
 
-import { Participant, Expense, SplitDetail } from "../types/interfaces";
-import { WiDayHail } from "react-icons/wi";
+import {
+  Participant,
+  Expense,
+  SplitDetail,
+  PaymentDetail,
+  ExpenseDetail,
+} from "../types/interfaces";
 
 interface ExpenseFormProps {
   participants: Participant[];
@@ -47,6 +52,13 @@ interface ExpenseFormProps {
   setSplitDetails: React.Dispatch<React.SetStateAction<SplitDetail[]>>;
   splitDetails: SplitDetail[];
   setParticipants: React.Dispatch<React.SetStateAction<Participant[]>>;
+}
+interface ExpenseFormValues {
+  title: string;
+  note: string;
+  cost: number;
+  paidBy: string[];
+  splitBy: string[];
 }
 
 export default function ExpenseForm({
@@ -60,20 +72,29 @@ export default function ExpenseForm({
   setParticipants,
 }: ExpenseFormProps) {
   const { register, control, handleSubmit, watch, reset, setValue } =
-    useForm<Expense>({
-      defaultValues: expense,
+    useForm<ExpenseFormValues>({
+      defaultValues: {
+        title: expense.title,
+        note: expense.note,
+        cost: expense.paidBy.amount,
+        paidBy: [expense.paidBy.participantId],
+        splitBy:
+          expense.id.length > 0
+            ? expense.splitBy.map((splitBy) => splitBy.participantId)
+            : [],
+      },
     });
 
-  useEffect(() => {
-    // if updating expense, convert splitDetails to participant ids
-    // to be used in the form
-    if (expense.id) {
-      const splitByParticipants = splitDetails.map(
-        (splitDetail) => splitDetail.participant
-      );
-      setValue("splitDetails", splitByParticipants);
-    }
-  }, [expense, splitDetails, setValue]);
+  // useEffect(() => {
+  //   // if updating expense, convert splitDetails to participant ids
+  //   // to be used in the form
+  //   if (expense.id) {
+  //     const splitByParticipants = splitDetails.map(
+  //       (splitDetail) => splitDetail.participant
+  //     );
+  //     setValue("splitDetails", splitByParticipants);
+  //   }
+  // }, [expense, splitDetails, setValue]);
 
   // options for paidBy select
   const participantsCollection = useMemo(() => {
@@ -92,117 +113,482 @@ export default function ExpenseForm({
       label: `${participant.firstName} ${participant.lastName}`,
       value: participant.id,
     }));
-    console.log("splitByParticipants", result);
+    // console.log("splitByParticipants", result);
     return result;
   }, [participants]);
 
-  const selectedValues = watch("splitDetails", []);
+  const selectedValues = watch("splitBy");
 
   const toggleSelection = (value: string) => {
     const updatedValues = selectedValues.includes(value)
       ? selectedValues.filter((v: string) => v !== value)
       : [...selectedValues, value];
 
-    setValue("splitDetails", updatedValues);
+    setValue("splitBy", updatedValues);
   };
 
   const handleDeleteExpense = () => {
-    const updatedParticipants: Participant[] = [];
+    // ** DELETE **
+    // === paid participant ===
+    // 1. Get the paid participant by id
+    // 2. Remove this expense from paid participant's paidExpenses
+    //      Update their paidTotal
+    //      Update their balance
+    // 3. Update paid participant in DB
 
-    for (let i = 0; i < participants.length; i++) {
-      const participant = participants[i];
-      // paidBy
-      if (participant.id === expense.paidBy) {
-        // remove paidExpense
-        const updatedPaidExpense = participant.paidExpense.filter(
-          (pe) => pe !== expense.id
-        );
-        participant.paidExpense = updatedPaidExpense;
-      }
+    // === split participants ===
+    // 1. For each split participant, remove this split expense from their splitExpenses
+    //        Update their splitTotal
+    //        Update their balance
+    //      Repeat 1. until all split participants are updated
+    // 2. Update split participants in DB
 
-      // remove splitBy
-      const updatedSplitDetails = participant.splitDetails.filter(
-        (sdId) => !expense.splitDetails.includes(sdId)
+    // => Now this expense can safely be deleted
+
+    // === paid participant ===
+    const paidParticipant = participants.find(
+      (participant) => participant.id === expense.paidBy.participantId
+    );
+    if (!paidParticipant) {
+      throw new Error(
+        `Paid participant ${expense.paidBy.participantId} not found`
       );
-      participant.splitDetails = updatedSplitDetails;
-      updatedParticipants.push(participant);
-    }
-    // remove and update splitDetails
-    setSplitDetails((prev) => prev.filter((sd) => sd.expense !== expense.id));
-
-    // update participants
-    setParticipants(updatedParticipants);
-
-    // remove and update expense
-    setExpenses((prev) => prev.filter((e) => e.id !== expense.id));
-  };
-
-  const onSubmit: SubmitHandler<Expense> = (data) => {
-    if (data.id.length) {
-      // if updating expense
-      // remove current splitDetails
-      setSplitDetails((prev) => prev.filter((sd) => sd.expense !== data.id));
-    } else {
-      data.id = uuidv4();
     }
 
-    // paidBy participant Id
-    data.paidBy = data.paidBy[0];
-
-    // the form uses participant ids, so we need to convert them to splitDetails
-    const splitDetails: SplitDetail[] = data.splitDetails.map(
-      (participantId) => {
-        const participant = participants.find(
-          (participant) => participant.id === participantId
-        );
-        if (!participant) {
-          throw new Error(`Participant with id ${participantId} not found`);
-        }
-        return {
-          id: uuidv4(),
-          expense: data.id,
-          participant: participant.id,
-          amount: data.cost / data.splitDetails.length,
-        };
-      }
+    const updatedPaidExpenses = paidParticipant.paidExpenses.filter(
+      (pe) => pe.expenseId !== expense.id
     );
 
-    data.splitDetails = splitDetails.map((splitDetail) => splitDetail.id);
+    paidParticipant.paidExpenses = updatedPaidExpenses;
+    paidParticipant.paidTotal = paidParticipant.paidExpenses.reduce(
+      (acc, curr) => acc + curr.amount,
+      0
+    );
+    paidParticipant.balance =
+      paidParticipant.paidTotal - paidParticipant.splitTotal;
+    setParticipants((prev) =>
+      prev.map((p) => (p.id === paidParticipant.id ? paidParticipant : p))
+    );
 
-    let updatedParticipants = participants.map((participant) => {
-      // loop through splitDetails, if participant.id === splitDetail.participant
-      // add splitDetail.id to participant.splitDetails
-      let matchSplitDetailId = "";
-
-      for (let i = 0; i < splitDetails.length; i++) {
-        const splitDetail = splitDetails[i];
-        if (splitDetail.participant === participant.id) {
-          matchSplitDetailId = splitDetail.id;
-          break;
-        }
+    // === split participants ===
+    for (let i = 0; i < expense.splitBy.length; i++) {
+      const splitParticipant = participants.find(
+        (participant) => participant.id === expense.splitBy[i].participantId
+      );
+      if (!splitParticipant) {
+        throw new Error(
+          `Split participant ${expense.splitBy[i].participantId} not found`
+        );
       }
-      console.log("participant.splitDetails", participant.splitDetails);
-      // participant.splitDetails.push(matchSplitDetailId);
-      return participant;
-    });
 
-    setSplitDetails((prev) => [...prev, ...splitDetails]);
+      const updatedSplitExpenses = splitParticipant.splitExpenses.filter(
+        (se) => se.expenseId !== expense.id
+      );
+      splitParticipant.splitExpenses = updatedSplitExpenses;
+      splitParticipant.splitTotal = splitParticipant.splitExpenses.reduce(
+        (acc, curr) => acc + curr.amount,
+        0
+      );
+      splitParticipant.balance =
+        splitParticipant.paidTotal - splitParticipant.splitTotal;
 
-    // updating expense
-    if (expense.id.length) {
-      setExpenses((prev) => prev.map((e) => (e.id === data.id ? data : e)));
+      setParticipants((prev) =>
+        prev.map((p) => (p.id === splitParticipant.id ? splitParticipant : p))
+      );
     }
+
+    setExpenses((prev) => prev.filter((e) => e.id !== expense.id));
+
+    reset();
+    setOpenExpenseForm(false);
+  };
+
+  const onSubmit: SubmitHandler<ExpenseFormValues> = (data) => {
+    console.log("data", data);
+
+    const { title, note, cost, paidBy, splitBy } = data;
+    const newExpenseCost = Number(cost);
+    const newPaidByDetail: PaymentDetail = {
+      participantId: paidBy[0],
+      amount: newExpenseCost,
+    };
+    const newSplitAmount = newExpenseCost / splitBy.length;
+    const newSplitByDetails: PaymentDetail[] = splitBy.map((participantId) => ({
+      participantId,
+      amount: newSplitAmount,
+    }));
+
     // new expense
-    else {
-      // add paidExpense to the paidBy participant
-      updatedParticipants = updatedParticipants.map((participant) => {
-        if (participant.id === data.paidBy) {
-          participant.paidExpense.push(data.id);
+    if (!expense.id.length) {
+      console.log("[NEW EXPENSE]");
+      // === Paid person ===
+      // 1. Get paid person, add this expense to their paidExpenses
+      // 2. Update their paidTotal
+      // 3. Update their balance
+      // 4. Update paid person in DB
+
+      // === Split participants ===
+      // 1. For each split participant, add this expense to their splitExpenses
+      // 2. Update their splitTotal
+      // 3. Update their balance
+      // 4. Update split participants in DB
+
+      // => Now this expense can safely be added to DB
+
+      const newExpenseId = uuidv4();
+
+      // === Paid person ===
+      const paidPerson = participants.find(
+        (participant) => participant.id === newPaidByDetail.participantId
+      );
+      if (!paidPerson) {
+        throw new Error(
+          `Paid person ${newPaidByDetail.participantId} not found`
+        );
+      }
+      paidPerson.paidExpenses = [
+        ...paidPerson.paidExpenses,
+        {
+          expenseId: newExpenseId,
+          amount: newExpenseCost,
+        },
+      ];
+      paidPerson.paidTotal = paidPerson.paidExpenses.reduce(
+        (acc, curr) => acc + curr.amount,
+        0
+      );
+      paidPerson.balance = paidPerson.paidTotal - paidPerson.splitTotal;
+      setParticipants((prev) =>
+        prev.map((p) => (p.id === paidPerson.id ? paidPerson : p))
+      );
+
+      // === Split participants ===
+      for (let i = 0; i < newSplitByDetails.length; i++) {
+        const splitParticipant = participants.find(
+          (participant) => participant.id === newSplitByDetails[i].participantId
+        );
+        if (!splitParticipant) {
+          throw new Error(
+            `Split participant ${newSplitByDetails[i].participantId} not found`
+          );
         }
-        return participant;
+        console.log("split participant", splitParticipant);
+        console.log(
+          "1. splitParticipant splitExpenses",
+          splitParticipant.splitExpenses
+        );
+        // const updatedSplitExpenses: ExpenseDetail[] = [
+        //   ...splitParticipant.splitExpenses,
+        // ].push({
+        //   expenseId: newExpenseId,
+        //   amount: newSplitAmount,
+        // });
+        // splitParticipant.splitExpenses.push({
+        //   expenseId: newExpenseId,
+        //   amount: newSplitAmount,
+        // });
+        splitParticipant.splitExpenses = [
+          ...splitParticipant.splitExpenses,
+          {
+            expenseId: newExpenseId,
+            amount: newSplitAmount,
+          },
+        ];
+        console.log(
+          "2. splitParticipant splitExpenses",
+          splitParticipant.splitExpenses
+        );
+        splitParticipant.splitTotal = splitParticipant.splitExpenses.reduce(
+          (acc, curr) => acc + curr.amount,
+          0
+        );
+        splitParticipant.balance =
+          splitParticipant.paidTotal - splitParticipant.splitTotal;
+        setParticipants((prev) =>
+          prev.map((p) => (p.id === splitParticipant.id ? splitParticipant : p))
+        );
+      }
+
+      const newExpense: Expense = {
+        id: newExpenseId,
+        title,
+        note,
+        paidBy: newPaidByDetail,
+        splitBy: newSplitByDetails,
+      };
+      setExpenses((prev) => [...prev, newExpense]);
+    }
+    // update expense
+    else {
+      console.log("[UPDATE EXPENSE]");
+      // === Paid person ===
+      // 1. If paidBy person is changed, update paidBy person's paidExpenses
+      //    === current paid person ===
+      //    1.1. Get current paidBy person, remove this expense from their paidExpenses
+      //    1.2. Update their paidTotal
+      //    1.3. Update their balance
+      //    1.4. Update paidBy person in DB
+      //    === new paid person ===
+      //    1.5. Get new paidBy person, add this expense with the right amount to their paidExpenses
+      //    1.6. Update their paidTotal
+      //    1.7. Update their balance
+      //    1.8. Update paidBy person in DB
+      // 2. Add new paymentDetail to this expense with new paid person and amount
+
+      // === Split participants ===
+      // 1. For each NEW split participant
+      //    1.1. if they are in the old split participants, update their splitExpenses (one that has the same expenseId)
+      //          Update their splitTotal
+      //          Update their balance
+      //     1.2. If they are not in the old split participants, add this expense to their splitExpenses
+      //      Repeat 1. until all split participants are updated
+      // 2. Update split participants in DB
+
+      // => Now this expense can safely be updated to DB
+
+      // ****** Paid person ******
+      // === current paid person ===
+      const currPaidPerson = participants.find(
+        (participant) => participant.id === expense.paidBy.participantId
+      );
+      if (!currPaidPerson) {
+        throw new Error(
+          `Previous paid person ${expense.paidBy.participantId} not found`
+        );
+      }
+      // paidBy person is changed
+      if (currPaidPerson.id !== newPaidByDetail.participantId) {
+        const updatedCurrPaidExpenses = currPaidPerson.paidExpenses.filter(
+          (pe) => pe.expenseId !== expense.id
+        );
+        currPaidPerson.paidExpenses = updatedCurrPaidExpenses;
+        currPaidPerson.paidTotal = currPaidPerson.paidExpenses.reduce(
+          (acc, curr) => acc + curr.amount,
+          0
+        );
+        currPaidPerson.balance =
+          currPaidPerson.paidTotal - currPaidPerson.splitTotal;
+        setParticipants((prev) =>
+          prev.map((p) => (p.id === currPaidPerson.id ? currPaidPerson : p))
+        );
+
+        // === new paid person ===
+        const newPaidPerson = participants.find(
+          (participant) => participant.id === newPaidByDetail.participantId
+        );
+        if (!newPaidPerson) {
+          throw new Error(
+            `New paid person ${newPaidByDetail.participantId} not found`
+          );
+        }
+
+        newPaidPerson.paidExpenses = [
+          ...newPaidPerson.paidExpenses,
+          {
+            expenseId: expense.id,
+            amount: cost,
+          },
+        ];
+
+        newPaidPerson.paidTotal = newPaidPerson.paidExpenses.reduce(
+          (acc, curr) => acc + curr.amount,
+          0
+        );
+        newPaidPerson.balance =
+          newPaidPerson.paidTotal - newPaidPerson.splitTotal;
+        setParticipants((prev) =>
+          prev.map((p) => (p.id === newPaidPerson.id ? newPaidPerson : p))
+        );
+      }
+      // paidBy person is not changed, but the cost is changed
+      else if (expense.paidBy.amount !== cost) {
+        const updatedCurrPaidExpenses = currPaidPerson.paidExpenses.map((pe) =>
+          pe.expenseId == expense.id ? { ...pe, amount: cost } : pe
+        );
+        currPaidPerson.paidExpenses = updatedCurrPaidExpenses;
+        currPaidPerson.paidTotal = currPaidPerson.paidExpenses.reduce(
+          (acc, curr) => acc + curr.amount,
+          0
+        );
+        currPaidPerson.balance =
+          currPaidPerson.paidTotal - currPaidPerson.splitTotal;
+        setParticipants((prev) =>
+          prev.map((p) => (p.id === currPaidPerson.id ? currPaidPerson : p))
+        );
+      }
+
+      // remove splitExpenses of prev split participants who are not in the new splitBy list
+      const prevSplitParticipantIds = expense.splitBy.filter((sb) => {
+        const found = newSplitByDetails.find(
+          (newSplitBy) => sb.participantId === newSplitBy.participantId
+        );
+        return !found;
       });
-      setParticipants(updatedParticipants);
-      setExpenses((prev) => [...prev, data]);
+
+      for (let i = 0; i < prevSplitParticipantIds.length; i++) {
+        const prevSplitParticipant = participants.find(
+          (participant) =>
+            participant.id === prevSplitParticipantIds[i].participantId
+        );
+        if (!prevSplitParticipant) {
+          throw new Error(
+            `Previous split participant ${prevSplitParticipantIds[i].participantId} not found`
+          );
+        }
+        const updatedSplitExpenses = prevSplitParticipant.splitExpenses.filter(
+          (se) => se.expenseId !== expense.id
+        );
+        prevSplitParticipant.splitExpenses = updatedSplitExpenses;
+        prevSplitParticipant.splitTotal =
+          prevSplitParticipant.splitExpenses.reduce(
+            (acc, curr) => acc + curr.amount,
+            0
+          );
+        prevSplitParticipant.balance =
+          prevSplitParticipant.paidTotal - prevSplitParticipant.splitTotal;
+        setParticipants((prev) =>
+          prev.map((p) =>
+            p.id === prevSplitParticipant.id ? prevSplitParticipant : p
+          )
+        );
+      }
+
+      // update or add splitExpenses to the new split participants
+      for (let i = 0; i < newSplitByDetails.length; i++) {
+        const newSplitParticipant = participants.find(
+          (participant) => participant.id === newSplitByDetails[i].participantId
+        );
+        if (!newSplitParticipant) {
+          throw new Error(
+            `New split participant ${newSplitByDetails[i].participantId} not found`
+          );
+        }
+
+        const splitExpenseFound = newSplitParticipant.splitExpenses.find(
+          (se) => se.expenseId === expense.id
+        );
+        // new split participant
+        if (!splitExpenseFound) {
+          newSplitParticipant.splitExpenses = [
+            ...newSplitParticipant.splitExpenses,
+            {
+              expenseId: expense.id,
+              amount: newSplitAmount,
+            },
+          ];
+        } // existing split participant
+        else {
+          const updatedSplitExpenses = newSplitParticipant.splitExpenses.map(
+            (se) =>
+              se.expenseId === expense.id
+                ? { ...se, amount: newSplitAmount }
+                : se
+          );
+          newSplitParticipant.splitExpenses = updatedSplitExpenses;
+        }
+
+        newSplitParticipant.splitTotal =
+          newSplitParticipant.splitExpenses.reduce(
+            (acc, curr) => acc + curr.amount,
+            0
+          );
+        newSplitParticipant.balance =
+          newSplitParticipant.paidTotal - newSplitParticipant.splitTotal;
+        setParticipants((prev) =>
+          prev.map((p) =>
+            p.id === newSplitParticipant.id ? newSplitParticipant : p
+          )
+        );
+      }
+
+      // THIS LOGIC IS NOT CORRECT!
+
+      // for (let i = 0; i < expense.splitBy.length; i++) {
+      //   const currSplitParticipantId = expense.splitBy[i].participantId;
+      //   for (let j = 0; j < newSplitByDetails.length; j++) {
+      //     const newSplitParticipantId = newSplitByDetails[j].participantId;
+      //     // the current split participant is in the new split participants, update their splitExpenses
+      //     if (currSplitParticipantId === newSplitParticipantId) {
+      //       const matchedSplitParticipant = participants.find(
+      //         (participant) => participant.id === currSplitParticipantId
+      //       );
+      //       if (!matchedSplitParticipant) {
+      //         throw new Error(
+      //           `Matched split participant ${currSplitParticipantId} not found`
+      //         );
+      //       }
+      //       const updatedSplitExpenses =
+      //         matchedSplitParticipant.splitExpenses.map((se) =>
+      //           se.expenseId === expense.id
+      //             ? { ...se, amount: newSplitAmount }
+      //             : se
+      //         );
+      //       matchedSplitParticipant.splitExpenses = updatedSplitExpenses;
+      //       matchedSplitParticipant.splitTotal =
+      //         matchedSplitParticipant.splitExpenses.reduce(
+      //           (acc, curr) => acc + curr.amount,
+      //           0
+      //         );
+      //       matchedSplitParticipant.balance =
+      //         matchedSplitParticipant.paidTotal -
+      //         matchedSplitParticipant.splitTotal;
+      //       setParticipants((prev) =>
+      //         prev.map((p) =>
+      //           p.id === matchedSplitParticipant.id
+      //             ? matchedSplitParticipant
+      //             : p
+      //         )
+      //       );
+      //       break;
+      //     }
+      //     // the current split participant is not in the new split participants, remove this expense from their splitExpenses
+      //     if (j === newSplitByDetails.length - 1) {
+      //       const currSplitParticipant = participants.find(
+      //         (participant) => participant.id === currSplitParticipantId
+      //       );
+      //       if (!currSplitParticipant) {
+      //         throw new Error(
+      //           `Current split participant ${currSplitParticipantId} not found`
+      //         );
+      //       }
+      //       const updatedSplitExpenses =
+      //         currSplitParticipant.splitExpenses.filter(
+      //           (se) => se.expenseId !== expense.id
+      //         );
+      //       currSplitParticipant.splitExpenses = updatedSplitExpenses;
+      //       currSplitParticipant.splitTotal =
+      //         currSplitParticipant.splitExpenses.reduce(
+      //           (acc, curr) => acc + curr.amount,
+      //           0
+      //         );
+      //       currSplitParticipant.balance =
+      //         currSplitParticipant.paidTotal - currSplitParticipant.splitTotal;
+      //       setParticipants((prev) =>
+      //         prev.map((p) =>
+      //           p.id === currSplitParticipant.id ? currSplitParticipant : p
+      //         )
+      //       );
+      //     }
+      //   }
+      // }
+
+      // const updatedSplitParticipants = newSplitByDetails.map(
+      //   (newSplitByDetail) => {
+      //     const matchedSplitParticipant = matchedSplitParticipants.find(
+      //       (splitBy) => splitBy.participantId === newSplitByDetail.participantId
+      //     );
+      //     if (matchedSplitParticipant) {
+
+      const updatedExpense = {
+        ...expense,
+        title,
+        note,
+        paidBy: newPaidByDetail,
+        splitBy: newSplitByDetails,
+      };
+      setExpenses((prev) =>
+        prev.map((e) => (e.id === updatedExpense.id ? updatedExpense : e))
+      );
     }
 
     reset();
@@ -220,7 +606,9 @@ export default function ExpenseForm({
       <DrawerContent roundedTop="l3">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DrawerHeader>
-            <DrawerTitle>New Expense</DrawerTitle>
+            <DrawerTitle>
+              {expense.id.length > 0 ? expense.title : "New Expense"}
+            </DrawerTitle>
           </DrawerHeader>
           <DrawerBody>
             <Field label="Title">
@@ -248,7 +636,7 @@ export default function ExpenseForm({
                       size="lg"
                       closeOnSelect
                       positioning={{ placement: "top", flip: false }}
-                      defaultValue={[expense.paidBy]}
+                      defaultValue={[expense.paidBy.participantId || ""]}
                     >
                       <SelectTrigger>
                         <SelectValueText placeholder="Paid by" />
@@ -293,7 +681,7 @@ export default function ExpenseForm({
                           type="checkbox"
                           id={participant.value}
                           value={participant.value}
-                          {...register(`splitDetails`)}
+                          {...register(`splitBy`)}
                           style={{
                             width: "100%",
                             height: "100%",

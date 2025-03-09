@@ -20,7 +20,13 @@ import { useForm, SubmitHandler } from "react-hook-form";
 import ExpenseForm from "@/app/components/ExpenseForm";
 import ParticipantForm from "@/app/components/ParticipantForm";
 import SplitResult from "@/app/components/SplitResult";
-import { Participant, Expense, SplitDetail } from "@/app/types/interfaces";
+import {
+  Participant,
+  Expense,
+  SplitDetail,
+  PaymentDetail,
+  Transaction,
+} from "@/app/types/interfaces";
 
 interface BillFormInput {
   title: string;
@@ -41,8 +47,8 @@ const defaultParticipant: Participant = {
   id: "",
   firstName: "",
   lastName: "",
-  paidExpense: [],
-  splitDetails: [],
+  paidExpenses: [],
+  splitExpenses: [],
   balance: 0,
   paidTotal: 0,
   splitTotal: 0,
@@ -50,13 +56,17 @@ const defaultParticipant: Participant = {
   transactionsTotal: 0,
 };
 
+const defPaymentDetail = {
+  participantId: "",
+  amount: 0,
+};
+
 const defaultExpense: Expense = {
   id: "",
   title: "",
   note: "",
-  cost: 0,
-  paidBy: "",
-  splitDetails: [],
+  paidBy: defPaymentDetail,
+  splitBy: [],
 };
 
 export default function BillForm() {
@@ -74,8 +84,8 @@ export default function BillForm() {
 
   const [splitDetails, setSplitDetails] = useState<SplitDetail[]>([]);
 
-  const [creditors, setCreditors] = useState<Participant[]>([]);
-  const [debtors, setDebtors] = useState<Participant[]>([]);
+  // const [creditors, setCreditors] = useState<Participant[]>([]);
+  // const [debtors, setDebtors] = useState<Participant[]>([]);
 
   useEffect(() => {
     console.log("Expenses state updated!", expenses);
@@ -83,29 +93,6 @@ export default function BillForm() {
 
   const onSubmit: SubmitHandler<BillFormInput> = (data) => {
     console.log(data);
-  };
-
-  const handleNewParticipant = () => {
-    setSelectedParticipant(defaultParticipant);
-    setOpenParticipantForm(true);
-  };
-
-  const handleUpdateParticipant = (participant: Participant) => {
-    setSelectedParticipant(participant);
-    setOpenParticipantForm(true);
-  };
-
-  const handleNewExpense = () => {
-    setSelectedExpense(defaultExpense);
-    setOpenExpenseForm(true);
-  };
-
-  const handleUpdateExpense = (expense: Expense) => {
-    setSelectedExpense(expense);
-    setOpenExpenseForm(true);
-  };
-
-  const handleSplit = () => {
     // For each participant:
     //    calculate the total amount paid
     //    calculate the total amount split
@@ -138,6 +125,129 @@ export default function BillForm() {
     //          => update debtor.balance = 0
     console.log("Expenses", expenses);
     console.log("Participants", participants);
+  };
+
+  const handleNewParticipant = () => {
+    setSelectedParticipant(defaultParticipant);
+    console.log("New Participant", selectedParticipant);
+    setOpenParticipantForm(true);
+  };
+
+  const handleUpdateParticipant = (participant: Participant) => {
+    setSelectedParticipant(participant);
+    setOpenParticipantForm(true);
+  };
+
+  const handleNewExpense = () => {
+    setSelectedExpense(defaultExpense);
+    setOpenExpenseForm(true);
+  };
+
+  const handleUpdateExpense = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setOpenExpenseForm(true);
+  };
+
+  const handleSplit = () => {
+    // For each participant:
+    //    calculate the total amount paid
+    //    calculate the total amount split
+    //    calculate the balance
+    //       if balance > 0, add to creditors[]
+    //       if balance < 0, add to debtors[]
+    //       if balance = 0, do nothing
+    //
+    // Validate: Get sum of creditors and debtors:
+    //    if sum of creditors = sum of debtors, proceed to split
+    //    if sum of creditors !== sum of debtors, generate error
+    //
+    // Split:
+    //    sort creditor[] descending, debtor[] ascending by balance
+    //    loop through creditors and debtors
+    //       const balance = creditor.balance - debtor.balance
+    //       if balance > 0
+    //          => debtor is settled, create transaction for debtor.balance
+    //          => update creditor.balance = balance
+    //          => update debtor.balance = 0
+    //          => creditor[i] stays the same, move to the next debtor[j+1]
+    //       if balance < 0
+    //          => creditor is settled, create transaction for debtor.balance
+    //          => update creditor.balance = 0
+    //          => update debtor.balance = balance
+    //          => debtor[j] stays the same, move to the next creditor[i+1]
+    //       if balance = 0
+    //          => creditor and debtor are settled, create transaction for debtor.balance
+    //          => update creditor.balance = 0
+    //          => update debtor.balance = 0
+    console.log("Expenses", expenses);
+    console.log("Participants", participants);
+
+    const creditors = participants
+      .filter((p) => p.balance > 0)
+      .sort((a, b) => b.balance - a.balance);
+    const debtors = participants
+      .filter((p) => p.balance < 0)
+      .sort((a, b) => a.balance - b.balance);
+    console.log("Creditors", creditors);
+    console.log("Debtors", debtors);
+
+    const creditorsTotal = creditors.reduce(
+      (acc: number, curr: Participant) => acc + curr.balance,
+      0
+    );
+    const debtorsTotal = debtors.reduce(
+      (acc: number, curr: Participant) => acc + curr.balance,
+      0
+    );
+
+    const netBalance = creditorsTotal + debtorsTotal;
+
+    if (netBalance !== 0) {
+      throw Error("Net balance is not zero!");
+    }
+    // setCreditors(newCreditors);
+    // setDebtors(newDebtors);
+
+    let balance = 0;
+    let j = 0;
+    for (let i = 0; i < creditors.length; i++) {
+      const creditor = creditors[i];
+      console.log("Creditor", creditor);
+      for (; j < debtors.length; j++) {
+        const debtor = debtors[j];
+        console.log("Debtor", debtor);
+        balance = creditor.balance + debtor.balance;
+        // debtor is settled
+        if (balance > 0) {
+          const transaction: Transaction = {
+            recipientId: creditor.id,
+            amount: Math.abs(debtor.balance),
+          };
+          debtor.transactions = [...debtor.transactions, transaction];
+          debtor.balance = 0;
+          creditor.balance = balance;
+        } // creditor is settled
+        else if (balance < 0) {
+          const transaction: Transaction = {
+            recipientId: creditor.id,
+            amount: Math.abs(debtor.balance),
+          };
+          debtor.transactions = [...debtor.transactions, transaction];
+          debtor.balance = balance;
+          creditor.balance = 0;
+          break;
+        } // both are settled
+        else {
+          const transaction: Transaction = {
+            recipientId: creditor.id,
+            amount: Math.abs(debtor.balance),
+          };
+          debtor.transactions = [...debtor.transactions, transaction];
+          debtor.balance = 0;
+          creditor.balance = 0;
+        }
+      }
+    }
   };
 
   return (
@@ -199,7 +309,6 @@ export default function BillForm() {
               <Flex justify="center" align="start" direction="column" gap={6}>
                 {expenses.length > 0 &&
                   expenses.map((expense) => {
-                    console.log("expense item", expense);
                     return (
                       <li key={expense.id}>
                         <Button
@@ -235,7 +344,7 @@ export default function BillForm() {
             </ul>
           </Field>
 
-          <Button type="submit" bgColor="lime.500">
+          <Button type="submit" bgColor="lime.500" onClick={handleSplit}>
             Split
           </Button>
         </Flex>
@@ -252,6 +361,7 @@ export default function BillForm() {
           splitDetails={splitDetails}
           setSplitDetails={setSplitDetails}
           expenses={expenses}
+          participants={participants}
         />
       )}
       {openExpenseForm && (
