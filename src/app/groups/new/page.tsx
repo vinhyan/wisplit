@@ -1,32 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
+import { useState } from "react";
 import {
   Flex,
   Heading,
-  // Fieldset,
   Input,
   Textarea,
-  // NativeSelect,
-  // NativeSelectField,
   Button,
   Avatar,
   Text,
+  List,
 } from "@chakra-ui/react";
 import { Field } from "@/components/ui/field";
 import { useForm, SubmitHandler } from "react-hook-form";
-
 import ExpenseForm from "@/app/components/ExpenseForm";
 import ParticipantForm from "@/app/components/ParticipantForm";
 import SplitResult from "@/app/components/SplitResult";
 import {
   Participant,
   Expense,
-  SplitDetail,
-  PaymentDetail,
   Transaction,
+  PaymentDetail,
 } from "@/app/types/interfaces";
+import { pickPalette } from "@/components/theme";
 
 interface BillFormInput {
   title: string;
@@ -53,10 +49,9 @@ const defaultParticipant: Participant = {
   paidTotal: 0,
   splitTotal: 0,
   transactions: [],
-  transactionsTotal: 0,
 };
 
-const defPaymentDetail = {
+const defPaymentDetail: PaymentDetail = {
   participantId: "",
   amount: 0,
 };
@@ -81,15 +76,6 @@ export default function BillForm() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [selectedExpense, setSelectedExpense] =
     useState<Expense>(defaultExpense);
-
-  const [splitDetails, setSplitDetails] = useState<SplitDetail[]>([]);
-
-  // const [creditors, setCreditors] = useState<Participant[]>([]);
-  // const [debtors, setDebtors] = useState<Participant[]>([]);
-
-  useEffect(() => {
-    console.log("Expenses state updated!", expenses);
-  }, [expenses]);
 
   const onSubmit: SubmitHandler<BillFormInput> = (data) => {
     console.log(data);
@@ -125,11 +111,15 @@ export default function BillForm() {
     //          => update debtor.balance = 0
     console.log("Expenses", expenses);
     console.log("Participants", participants);
+
+    splitExpenseGroup();
+
+    // create new group and save to DB
+    reset();
   };
 
   const handleNewParticipant = () => {
     setSelectedParticipant(defaultParticipant);
-    console.log("New Participant", selectedParticipant);
     setOpenParticipantForm(true);
   };
 
@@ -148,7 +138,7 @@ export default function BillForm() {
     setOpenExpenseForm(true);
   };
 
-  const handleSplit = () => {
+  const splitExpenseGroup = () => {
     // For each participant:
     //    calculate the total amount paid
     //    calculate the total amount split
@@ -205,8 +195,6 @@ export default function BillForm() {
     if (netBalance !== 0) {
       throw Error("Net balance is not zero!");
     }
-    // setCreditors(newCreditors);
-    // setDebtors(newDebtors);
 
     let balance = 0;
     let j = 0;
@@ -217,37 +205,33 @@ export default function BillForm() {
         const debtor = debtors[j];
         console.log("Debtor", debtor);
         balance = creditor.balance + debtor.balance;
+
+        const transaction: Transaction = {
+          recipientId: creditor.id,
+          amount: Math.abs(debtor.balance),
+        };
+        debtor.transactions = [...debtor.transactions, transaction];
+
         // debtor is settled
         if (balance > 0) {
-          const transaction: Transaction = {
-            recipientId: creditor.id,
-            amount: Math.abs(debtor.balance),
-          };
-          debtor.transactions = [...debtor.transactions, transaction];
           debtor.balance = 0;
           creditor.balance = balance;
-        } // creditor is settled
+        }
+        // creditor is settled
         else if (balance < 0) {
-          const transaction: Transaction = {
-            recipientId: creditor.id,
-            amount: Math.abs(debtor.balance),
-          };
-          debtor.transactions = [...debtor.transactions, transaction];
           debtor.balance = balance;
           creditor.balance = 0;
           break;
-        } // both are settled
+        }
+        // both are settled
         else {
-          const transaction: Transaction = {
-            recipientId: creditor.id,
-            amount: Math.abs(debtor.balance),
-          };
-          debtor.transactions = [...debtor.transactions, transaction];
           debtor.balance = 0;
           creditor.balance = 0;
         }
       }
     }
+
+    setParticipants([...debtors, ...creditors]);
   };
 
   return (
@@ -281,8 +265,10 @@ export default function BillForm() {
                               key={participant.id}
                               variant="subtle"
                               size="lg"
+                              bg={pickPalette(participant.id)}
                             >
                               <Avatar.Fallback
+                                color="black"
                                 name={`${participant.firstName} ${participant.lastName}`}
                               />
                             </Avatar.Root>
@@ -298,53 +284,50 @@ export default function BillForm() {
                 minW="auto"
                 onClick={() => handleNewParticipant()}
               >
-                <Avatar.Root variant="solid" size="lg">
+                <Avatar.Root variant="solid" size="lg" bg="#F8F8F8">
                   <Avatar.Fallback name="+" />
                 </Avatar.Root>
               </Button>
             </Flex>
           </Field>
           <Field label="Expenses">
-            <ul>
-              <Flex justify="center" align="start" direction="column" gap={6}>
-                {expenses.length > 0 &&
-                  expenses.map((expense) => {
-                    return (
-                      <li key={expense.id}>
-                        <Button
-                          variant="subtle"
-                          p="0"
-                          size="lg"
-                          onClick={() => {
-                            handleUpdateExpense(expense);
-                          }}
-                        >
-                          {expense.title}
-                        </Button>
-                      </li>
-                    );
-                  })}
-                {participants.length > 0 ? (
-                  <Button
-                    variant="plain"
-                    p="0"
-                    minW="auto"
-                    onClick={() => {
-                      handleNewExpense();
-                    }}
-                  >
-                    <Avatar.Root variant="solid" size="lg">
-                      <Avatar.Fallback name="+" />
-                    </Avatar.Root>
-                  </Button>
-                ) : (
-                  <Text>No participants added yet</Text>
-                )}
-              </Flex>
-            </ul>
+            <List.Root variant="plain">
+              {expenses.length > 0 &&
+                expenses.map((expense) => {
+                  return (
+                    <List.Item key={expense.id}>
+                      <Button
+                        variant="plain"
+                        p="0"
+                        size="lg"
+                        onClick={() => {
+                          handleUpdateExpense(expense);
+                        }}
+                      >
+                        {expense.title}
+                      </Button>
+                    </List.Item>
+                  );
+                })}
+              {participants.length > 0 ? (
+                <Button
+                  variant="plain"
+                  p="0"
+                  minW="auto"
+                  onClick={() => {
+                    handleNewExpense();
+                  }}
+                >
+                  <Avatar.Root variant="solid" size="lg" bg="#F8F8F8">
+                    <Avatar.Fallback name="+" />
+                  </Avatar.Root>
+                </Button>
+              ) : (
+                <Text>Participants list is empty</Text>
+              )}
+            </List.Root>
           </Field>
-
-          <Button type="submit" bgColor="lime.500" onClick={handleSplit}>
+          <Button type="submit" bgColor="lime.500" rounded="full" minW="150px">
             Split
           </Button>
         </Flex>
@@ -358,8 +341,6 @@ export default function BillForm() {
           setOpenParticipantForm={setOpenParticipantForm}
           participant={selectedParticipant}
           setExpenses={setExpenses}
-          splitDetails={splitDetails}
-          setSplitDetails={setSplitDetails}
           expenses={expenses}
           participants={participants}
         />
@@ -371,8 +352,6 @@ export default function BillForm() {
           setOpenExpenseForm={setOpenExpenseForm}
           expense={selectedExpense}
           participants={participants}
-          setSplitDetails={setSplitDetails}
-          splitDetails={splitDetails}
           setParticipants={setParticipants}
         />
       )}

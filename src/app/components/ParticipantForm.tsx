@@ -1,10 +1,9 @@
 "use client ";
 
-// import { useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { Input, Button } from "@chakra-ui/react";
 import { Field } from "@/components/ui/field";
-import { useForm, SubmitHandler, set } from "react-hook-form";
+import { useForm, SubmitHandler } from "react-hook-form";
 
 import { Avatar } from "@chakra-ui/react";
 
@@ -20,12 +19,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 
-import {
-  Participant,
-  Expense,
-  SplitDetail,
-  ExpenseDetail,
-} from "@/app/types/interfaces";
+import { Participant, Expense, ExpenseDetail } from "@/app/types/interfaces";
 
 interface ParticipantFormProps {
   openParticipantForm: boolean;
@@ -34,8 +28,6 @@ interface ParticipantFormProps {
   participant: Participant;
   expenses: Expense[];
   setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
-  splitDetails: SplitDetail[];
-  setSplitDetails: React.Dispatch<React.SetStateAction<SplitDetail[]>>;
   participants: Participant[];
 }
 
@@ -46,8 +38,6 @@ export default function ParticipantForm({
   participant,
   expenses,
   setExpenses,
-  splitDetails,
-  setSplitDetails,
   participants,
 }: ParticipantFormProps) {
   const { register, handleSubmit, reset } = useForm<Participant>({

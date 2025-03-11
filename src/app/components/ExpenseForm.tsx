@@ -1,8 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
+import { useMemo } from "react";
 
 import {
   Flex,
-  // Heading,
   Text,
   Input,
   Textarea,
@@ -16,7 +15,7 @@ import {
   createListCollection,
 } from "@chakra-ui/react";
 import { Field } from "@/components/ui/field";
-import { useForm, SubmitHandler, Controller, set } from "react-hook-form";
+import { useForm, SubmitHandler, Controller } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
 import {
   DrawerActionTrigger,
@@ -35,13 +34,8 @@ import {
   NumberInputRoot,
 } from "@/components/ui/number-input";
 
-import {
-  Participant,
-  Expense,
-  SplitDetail,
-  PaymentDetail,
-  ExpenseDetail,
-} from "../types/interfaces";
+import { Participant, Expense, PaymentDetail } from "../types/interfaces";
+import { pickPalette } from "@/components/theme";
 
 interface ExpenseFormProps {
   participants: Participant[];
@@ -49,8 +43,6 @@ interface ExpenseFormProps {
   openExpenseForm: boolean;
   setOpenExpenseForm: React.Dispatch<React.SetStateAction<boolean>>;
   expense: Expense;
-  setSplitDetails: React.Dispatch<React.SetStateAction<SplitDetail[]>>;
-  splitDetails: SplitDetail[];
   setParticipants: React.Dispatch<React.SetStateAction<Participant[]>>;
 }
 interface ExpenseFormValues {
@@ -67,8 +59,6 @@ export default function ExpenseForm({
   setExpenses,
   openExpenseForm,
   setOpenExpenseForm,
-  setSplitDetails,
-  splitDetails,
   setParticipants,
 }: ExpenseFormProps) {
   const { register, control, handleSubmit, watch, reset, setValue } =
@@ -84,17 +74,6 @@ export default function ExpenseForm({
             : [],
       },
     });
-
-  // useEffect(() => {
-  //   // if updating expense, convert splitDetails to participant ids
-  //   // to be used in the form
-  //   if (expense.id) {
-  //     const splitByParticipants = splitDetails.map(
-  //       (splitDetail) => splitDetail.participant
-  //     );
-  //     setValue("splitDetails", splitByParticipants);
-  //   }
-  // }, [expense, splitDetails, setValue]);
 
   // options for paidBy select
   const participantsCollection = useMemo(() => {
@@ -113,7 +92,6 @@ export default function ExpenseForm({
       label: `${participant.firstName} ${participant.lastName}`,
       value: participant.id,
     }));
-    // console.log("splitByParticipants", result);
     return result;
   }, [participants]);
 
@@ -272,21 +250,7 @@ export default function ExpenseForm({
             `Split participant ${newSplitByDetails[i].participantId} not found`
           );
         }
-        console.log("split participant", splitParticipant);
-        console.log(
-          "1. splitParticipant splitExpenses",
-          splitParticipant.splitExpenses
-        );
-        // const updatedSplitExpenses: ExpenseDetail[] = [
-        //   ...splitParticipant.splitExpenses,
-        // ].push({
-        //   expenseId: newExpenseId,
-        //   amount: newSplitAmount,
-        // });
-        // splitParticipant.splitExpenses.push({
-        //   expenseId: newExpenseId,
-        //   amount: newSplitAmount,
-        // });
+
         splitParticipant.splitExpenses = [
           ...splitParticipant.splitExpenses,
           {
@@ -294,10 +258,7 @@ export default function ExpenseForm({
             amount: newSplitAmount,
           },
         ];
-        console.log(
-          "2. splitParticipant splitExpenses",
-          splitParticipant.splitExpenses
-        );
+
         splitParticipant.splitTotal = splitParticipant.splitExpenses.reduce(
           (acc, curr) => acc + curr.amount,
           0
@@ -501,84 +462,6 @@ export default function ExpenseForm({
         );
       }
 
-      // THIS LOGIC IS NOT CORRECT!
-
-      // for (let i = 0; i < expense.splitBy.length; i++) {
-      //   const currSplitParticipantId = expense.splitBy[i].participantId;
-      //   for (let j = 0; j < newSplitByDetails.length; j++) {
-      //     const newSplitParticipantId = newSplitByDetails[j].participantId;
-      //     // the current split participant is in the new split participants, update their splitExpenses
-      //     if (currSplitParticipantId === newSplitParticipantId) {
-      //       const matchedSplitParticipant = participants.find(
-      //         (participant) => participant.id === currSplitParticipantId
-      //       );
-      //       if (!matchedSplitParticipant) {
-      //         throw new Error(
-      //           `Matched split participant ${currSplitParticipantId} not found`
-      //         );
-      //       }
-      //       const updatedSplitExpenses =
-      //         matchedSplitParticipant.splitExpenses.map((se) =>
-      //           se.expenseId === expense.id
-      //             ? { ...se, amount: newSplitAmount }
-      //             : se
-      //         );
-      //       matchedSplitParticipant.splitExpenses = updatedSplitExpenses;
-      //       matchedSplitParticipant.splitTotal =
-      //         matchedSplitParticipant.splitExpenses.reduce(
-      //           (acc, curr) => acc + curr.amount,
-      //           0
-      //         );
-      //       matchedSplitParticipant.balance =
-      //         matchedSplitParticipant.paidTotal -
-      //         matchedSplitParticipant.splitTotal;
-      //       setParticipants((prev) =>
-      //         prev.map((p) =>
-      //           p.id === matchedSplitParticipant.id
-      //             ? matchedSplitParticipant
-      //             : p
-      //         )
-      //       );
-      //       break;
-      //     }
-      //     // the current split participant is not in the new split participants, remove this expense from their splitExpenses
-      //     if (j === newSplitByDetails.length - 1) {
-      //       const currSplitParticipant = participants.find(
-      //         (participant) => participant.id === currSplitParticipantId
-      //       );
-      //       if (!currSplitParticipant) {
-      //         throw new Error(
-      //           `Current split participant ${currSplitParticipantId} not found`
-      //         );
-      //       }
-      //       const updatedSplitExpenses =
-      //         currSplitParticipant.splitExpenses.filter(
-      //           (se) => se.expenseId !== expense.id
-      //         );
-      //       currSplitParticipant.splitExpenses = updatedSplitExpenses;
-      //       currSplitParticipant.splitTotal =
-      //         currSplitParticipant.splitExpenses.reduce(
-      //           (acc, curr) => acc + curr.amount,
-      //           0
-      //         );
-      //       currSplitParticipant.balance =
-      //         currSplitParticipant.paidTotal - currSplitParticipant.splitTotal;
-      //       setParticipants((prev) =>
-      //         prev.map((p) =>
-      //           p.id === currSplitParticipant.id ? currSplitParticipant : p
-      //         )
-      //       );
-      //     }
-      //   }
-      // }
-
-      // const updatedSplitParticipants = newSplitByDetails.map(
-      //   (newSplitByDetail) => {
-      //     const matchedSplitParticipant = matchedSplitParticipants.find(
-      //       (splitBy) => splitBy.participantId === newSplitByDetail.participantId
-      //     );
-      //     if (matchedSplitParticipant) {
-
       const updatedExpense = {
         ...expense,
         title,
@@ -665,6 +548,7 @@ export default function ExpenseForm({
                   {splitByParticipants.map((participant) => (
                     <Flex align="center" gap={2} key={participant.value}>
                       <Avatar.Root
+                        bg={pickPalette(participant.value)}
                         key={participant.value}
                         variant="subtle"
                         size="lg"
@@ -690,7 +574,10 @@ export default function ExpenseForm({
                             appearance: "none",
                           }}
                         />
-                        <Avatar.Fallback name={participant.label} />
+                        <Avatar.Fallback
+                          name={participant.label}
+                          color="black"
+                        />
                       </Avatar.Root>
 
                       <label htmlFor={participant.label}>

@@ -1,4 +1,4 @@
-export interface Bill {
+export interface Group {
   id: string;
   code: string;
   title: string;
@@ -26,7 +26,6 @@ export interface Participant {
   paidTotal: number;
   splitTotal: number;
   transactions: Transaction[];
-  transactionsTotal: number; // ??
 }
 
 // // SharedDetail
@@ -56,64 +55,64 @@ export interface Expense {
   splitBy: PaymentDetail[];
 }
 
-const johnDoe = {
-  id: "123",
-  firstName: "John",
-  lastName: "Doe",
-  paidExpenses: [],
-  splitExpenses: [],
-  balance: 0,
-  paidTotal: 0,
-  splitTotal: 0,
-};
+// const johnDoe = {
+//   id: "123",
+//   firstName: "John",
+//   lastName: "Doe",
+//   paidExpenses: [],
+//   splitExpenses: [],
+//   balance: 0,
+//   paidTotal: 0,
+//   splitTotal: 0,
+// };
 
-const kimLoe = {
-  id: "456",
-  firstName: "Kim",
-  lastName: "Loe",
-  paidExpenses: [],
-  splitExpenses: [],
-  balance: 0,
-  paidTotal: 0,
-  splitTotal: 0,
-};
+// const kimLoe = {
+//   id: "456",
+//   firstName: "Kim",
+//   lastName: "Loe",
+//   paidExpenses: [],
+//   splitExpenses: [],
+//   balance: 0,
+//   paidTotal: 0,
+//   splitTotal: 0,
+// };
 
-const seanFoe = {
-  id: "001",
-  firstName: "Sean",
-  lastName: "Foe",
-  paidExpenses: [],
-  splitExpenses: [],
-  balance: 0,
-  paidTotal: 0,
-  splitTotal: 0,
-};
+// const seanFoe = {
+//   id: "001",
+//   firstName: "Sean",
+//   lastName: "Foe",
+//   paidExpenses: [],
+//   splitExpenses: [],
+//   balance: 0,
+//   paidTotal: 0,
+//   splitTotal: 0,
+// };
 
-const expense1 = {
-  id: "123456",
-  title: "Some title",
-  note: "Some notes",
-  paidBy: { participant: "123", amount: 200 },
-  splitBy: [
-    { participant: "456", amount: 100 },
-    { participant: "001", amount: 100 },
-  ],
-};
+// const expense1 = {
+//   id: "123456",
+//   title: "Some title",
+//   note: "Some notes",
+//   paidBy: { participant: "123", amount: 200 },
+//   splitBy: [
+//     { participant: "456", amount: 100 },
+//     { participant: "001", amount: 100 },
+//   ],
+// };
 // curr splitby participants = ["456", "001", "123", "047" ]
 // new splitby participants = ["456", "123", "789"]
 
 // split participants who are not in the new splitby participants = ["001", "047"]
 
-const mikeMoe = {
-  id: "789",
-  firstName: "Mike",
-  lastName: "Moe",
-  paidExpenses: [],
-  splitExpenses: [],
-  balance: 0,
-  paidTotal: 0,
-  splitTotal: 0,
-};
+// const mikeMoe = {
+//   id: "789",
+//   firstName: "Mike",
+//   lastName: "Moe",
+//   paidExpenses: [],
+//   splitExpenses: [],
+//   balance: 0,
+//   paidTotal: 0,
+//   splitTotal: 0,
+// };
 
 // const expense2 = {
 //   id: "654321",
