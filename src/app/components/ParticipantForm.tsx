@@ -1,12 +1,16 @@
 "use client ";
 
 import { v4 as uuidv4 } from "uuid";
-import { Input, Button } from "@chakra-ui/react";
-import { Field } from "@/components/ui/field";
+import {
+  Input,
+  Button,
+  Field,
+  Avatar,
+  Flex,
+  Dialog,
+  Portal,
+} from "@chakra-ui/react";
 import { useForm, SubmitHandler } from "react-hook-form";
-
-import { Avatar } from "@chakra-ui/react";
-
 import {
   DrawerActionTrigger,
   DrawerBackdrop,
@@ -40,7 +44,12 @@ export default function ParticipantForm({
   setExpenses,
   participants,
 }: ParticipantFormProps) {
-  const { register, handleSubmit, reset } = useForm<Participant>({
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<Participant>({
     defaultValues: {
       id: participant.id,
       firstName: participant.firstName,
@@ -172,7 +181,6 @@ export default function ParticipantForm({
             }
             return se;
           }
-          // se.expenseId === splitExpense.id ? (se.amount = newSplitAmount) : se
         );
         splitParticipant.splitExpenses = updatedSplitExpenses;
         splitParticipant.splitTotal = splitParticipant.splitExpenses.reduce(
@@ -207,45 +215,135 @@ export default function ParticipantForm({
     >
       <DrawerBackdrop />
       <DrawerContent roundedTop="l3">
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <DrawerHeader>
-            <DrawerTitle>
-              {participant.id.length > 0 ? (
-                <Avatar.Root key={participant.id} variant="subtle" size="lg">
-                  <Avatar.Fallback
-                    name={`${participant.firstName} ${participant.lastName}`}
-                  />
-                </Avatar.Root>
-              ) : (
-                "New Participant"
-              )}
-            </DrawerTitle>
-          </DrawerHeader>
-          <DrawerBody>
-            <Field label="First Name">
-              <Input {...register("firstName")} />
-            </Field>
-            <Field label="Last Name">
-              <Input {...register("lastName")} />
-            </Field>
-            {participant.id.length > 0 && (
-              <Button
-                onClick={handleDeleteParticipant}
-                variant="outline"
-                colorPalette="red"
-              >
-                Delete
-              </Button>
-            )}
-          </DrawerBody>
-          <DrawerFooter>
-            <DrawerActionTrigger asChild>
-              <Button variant="outline">Cancel</Button>
-            </DrawerActionTrigger>
-            <Button type="submit">Save</Button>
-          </DrawerFooter>
-          <DrawerCloseTrigger />
-        </form>
+        <Flex align="center" direction="column" py={4}>
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            style={{ width: "100%", maxWidth: "370px" }}
+          >
+            <Flex align="center" direction="column" rowGap={4}>
+              <DrawerHeader>
+                <DrawerTitle>
+                  {participant.id.length > 0 ? (
+                    <Avatar.Root
+                      key={participant.id}
+                      variant="subtle"
+                      size="lg"
+                    >
+                      <Avatar.Fallback
+                        name={`${participant.firstName} ${participant.lastName}`}
+                      />
+                    </Avatar.Root>
+                  ) : (
+                    "New Participant"
+                  )}
+                </DrawerTitle>
+              </DrawerHeader>
+              <Flex direction="column" gap={4} width="100%" maxW="370px">
+                <DrawerBody>
+                  <Flex direction="column" gap={6}>
+                    <Field.Root invalid={!!errors.firstName}>
+                      <Field.Label>First Name</Field.Label>
+                      <Input
+                        {...register("firstName", {
+                          required: "Required",
+                        })}
+                      />
+                      <Field.ErrorText>
+                        {errors.firstName && errors.firstName.message}
+                      </Field.ErrorText>
+                    </Field.Root>
+                    <Field.Root invalid={!!errors.lastName}>
+                      <Field.Label>Last Name</Field.Label>
+                      <Input
+                        {...register("lastName", {
+                          required: "Required",
+                        })}
+                      />
+                      <Field.ErrorText>
+                        {errors.lastName && errors.lastName.message}
+                      </Field.ErrorText>
+                    </Field.Root>
+                  </Flex>
+                </DrawerBody>
+                <DrawerFooter>
+                  <Flex
+                    justify={
+                      participant.id.length > 0 ? "space-between" : "center"
+                    }
+                    width="100%"
+                  >
+                    {participant.id.length > 0 && (
+                      <Dialog.Root role="alertdialog">
+                        <Dialog.Trigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            rounded="full"
+                            colorPalette="red"
+                          >
+                            Delete
+                          </Button>
+                        </Dialog.Trigger>
+                        <Portal>
+                          <Dialog.Backdrop />
+                          <Dialog.Positioner>
+                            <Dialog.Content>
+                              <Dialog.Header>
+                                <Dialog.Title>
+                                  Delete {participant.firstName}{" "}
+                                  {participant.lastName}?
+                                </Dialog.Title>
+                              </Dialog.Header>
+                              <Dialog.Body>
+                                <p>
+                                  Deleting participant will remove all related
+                                  expenses.
+                                </p>
+                              </Dialog.Body>
+                              <Dialog.Footer>
+                                <Dialog.ActionTrigger asChild>
+                                  <Button variant="outline" rounded="full">
+                                    Cancel
+                                  </Button>
+                                </Dialog.ActionTrigger>
+                                <Button
+                                  rounded="full"
+                                  colorPalette="red"
+                                  onClick={handleDeleteParticipant}
+                                >
+                                  Delete
+                                </Button>
+                              </Dialog.Footer>
+                            </Dialog.Content>
+                          </Dialog.Positioner>
+                        </Portal>
+                      </Dialog.Root>
+                    )}
+                    <Flex gap={2}>
+                      <DrawerActionTrigger asChild>
+                        <Button variant="outline" rounded="full">
+                          Cancel
+                        </Button>
+                      </DrawerActionTrigger>
+                      <Button
+                        rounded="full"
+                        type="submit"
+                        disabled={Object.keys(errors).length > 0}
+                        loading={isSubmitting}
+                        loadingText="Saving..."
+                        spinnerPlacement="start"
+                        bgColor="lime.500"
+                      >
+                        Save
+                      </Button>
+                    </Flex>
+                  </Flex>
+                </DrawerFooter>
+              </Flex>
+              <DrawerCloseTrigger />
+            </Flex>
+          </form>
+        </Flex>
       </DrawerContent>
     </DrawerRoot>
   );

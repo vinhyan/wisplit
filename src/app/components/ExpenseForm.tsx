@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import {
   Flex,
@@ -13,8 +13,10 @@ import {
   SelectTrigger,
   SelectValueText,
   createListCollection,
+  Field,
+  Dialog,
+  Portal,
 } from "@chakra-ui/react";
-import { Field } from "@/components/ui/field";
 import { useForm, SubmitHandler, Controller } from "react-hook-form";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -61,19 +63,26 @@ export default function ExpenseForm({
   setOpenExpenseForm,
   setParticipants,
 }: ExpenseFormProps) {
-  const { register, control, handleSubmit, watch, reset, setValue } =
-    useForm<ExpenseFormValues>({
-      defaultValues: {
-        title: expense.title,
-        note: expense.note,
-        cost: expense.paidBy.amount,
-        paidBy: [expense.paidBy.participantId],
-        splitBy:
-          expense.id.length > 0
-            ? expense.splitBy.map((splitBy) => splitBy.participantId)
-            : [],
-      },
-    });
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    reset,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = useForm<ExpenseFormValues>({
+    defaultValues: {
+      title: expense.title,
+      note: expense.note,
+      cost: expense.paidBy.amount,
+      paidBy: [expense.paidBy.participantId],
+      splitBy:
+        expense.id.length > 0
+          ? expense.splitBy.map((splitBy) => splitBy.participantId)
+          : [],
+    },
+  });
 
   // options for paidBy select
   const participantsCollection = useMemo(() => {
@@ -185,6 +194,7 @@ export default function ExpenseForm({
     console.log("data", data);
 
     const { title, note, cost, paidBy, splitBy } = data;
+    console.log("paidBy", paidBy);
     const newExpenseCost = Number(cost);
     const newPaidByDetail: PaymentDetail = {
       participantId: paidBy[0],
@@ -487,127 +497,244 @@ export default function ExpenseForm({
     >
       <DrawerBackdrop />
       <DrawerContent roundedTop="l3">
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <DrawerHeader>
-            <DrawerTitle>
-              {expense.id.length > 0 ? expense.title : "New Expense"}
-            </DrawerTitle>
-          </DrawerHeader>
-          <DrawerBody>
-            <Field label="Title">
-              <Input {...register("title")} />
-            </Field>
-            <Field label="Note">
-              <Textarea {...register("note")} />
-            </Field>
-            <Field label="Cost">
-              <NumberInputRoot defaultValue="">
-                <NumberInputField {...register("cost")} />
-              </NumberInputRoot>
-            </Field>
-            {/* <Field label="Paid By"> */}
-            <Field label="Paid By">
-              {participants.length ? (
-                <Controller
-                  control={control}
-                  name="paidBy"
-                  render={({ field }) => (
-                    <SelectRoot
-                      collection={participantsCollection}
-                      onValueChange={({ value }) => field.onChange(value)}
-                      onInteractOutside={() => field.onBlur()}
-                      size="lg"
-                      closeOnSelect
-                      positioning={{ placement: "top", flip: false }}
-                      defaultValue={[expense.paidBy.participantId || ""]}
-                    >
-                      <SelectTrigger>
-                        <SelectValueText placeholder="Paid by" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {participantsCollection.items.map((participant) => (
-                          <SelectItem
-                            item={participant}
-                            key={participant.value}
+        <Flex align="center" direction="column" py={4}>
+          <form
+            onSubmit={handleSubmit(onSubmit)}
+            style={{ width: "100%", maxWidth: "370px" }}
+          >
+            <Flex align="center" direction="column" rowGap={4}>
+              <DrawerHeader>
+                <DrawerTitle>
+                  {expense.id.length > 0 ? expense.title : "New Expense"}
+                </DrawerTitle>
+              </DrawerHeader>
+              <Flex direction="column" gap={4} width="100%" maxW="370px">
+                <DrawerBody>
+                  <Flex direction="column" gap={6}>
+                    <Field.Root invalid={!!errors.title}>
+                      <Field.Label>Title </Field.Label>
+                      <Input {...register("title", { required: "Required" })} />
+                      <Field.ErrorText>
+                        {errors.title && errors.title.message}
+                      </Field.ErrorText>
+                    </Field.Root>
+
+                    <Field.Root>
+                      <Field.Label>Note</Field.Label>
+                      <Textarea {...register("note")} />
+                    </Field.Root>
+
+                    <Field.Root invalid={!!errors.cost}>
+                      <Field.Label>Cost</Field.Label>
+                      <NumberInputRoot defaultValue="">
+                        <NumberInputField
+                          {...register("cost", {
+                            validate: (value) =>
+                              value > 0 || "Cost must be greater than 0",
+                          })}
+                        />
+                      </NumberInputRoot>
+                      <Field.ErrorText>
+                        {errors.cost && errors.cost.message}
+                      </Field.ErrorText>
+                    </Field.Root>
+
+                    <Field.Root invalid={!!errors.paidBy}>
+                      <Field.Label> Paid By</Field.Label>
+                      {participants.length ? (
+                        <>
+                          <Controller
+                            control={control}
+                            name="paidBy"
+                            rules={{
+                              validate: (value) =>
+                                (value && value[0].length > 0) || "Required",
+                            }}
+                            render={({ field }) => (
+                              <SelectRoot
+                                collection={participantsCollection}
+                                onValueChange={({ value }) =>
+                                  field.onChange(value)
+                                }
+                                onInteractOutside={() => field.onBlur()}
+                                size="lg"
+                                closeOnSelect
+                                positioning={{ placement: "top", flip: false }}
+                                name={field.name}
+                                value={field.value}
+                              >
+                                <SelectTrigger>
+                                  <SelectValueText placeholder="Paid by..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {participantsCollection.items.map(
+                                    (participant) => (
+                                      <SelectItem
+                                        item={participant}
+                                        key={participant.value}
+                                      >
+                                        {participant.label}
+                                      </SelectItem>
+                                    )
+                                  )}
+                                </SelectContent>
+                              </SelectRoot>
+                            )}
+                          />
+                          <Field.ErrorText>
+                            {errors.paidBy && errors.paidBy.message}
+                          </Field.ErrorText>
+                        </>
+                      ) : (
+                        <Text>No participants</Text>
+                      )}
+                    </Field.Root>
+
+                    <Field.Root invalid={!!errors.splitBy}>
+                      <Field.Label>Split By</Field.Label>
+                      {participants.length ? (
+                        <Flex
+                          direction="column"
+                          justify="center"
+                          align="start"
+                          gap={2}
+                        >
+                          {splitByParticipants.map((participant) => (
+                            <Flex
+                              align="center"
+                              gap={2}
+                              key={participant.value}
+                            >
+                              <Avatar.Root
+                                bg={
+                                  selectedValues.includes(participant.value)
+                                    ? pickPalette(participant.value)
+                                    : "gray"
+                                }
+                                key={participant.value}
+                                variant="subtle"
+                                size="lg"
+                                onClick={() =>
+                                  toggleSelection(participant.value)
+                                }
+                                style={{
+                                  cursor: "pointer",
+                                  borderRadius: "50%",
+                                }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  id={participant.value}
+                                  value={participant.value}
+                                  {...register(`splitBy`, {
+                                    required: "Required",
+                                  })}
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    position: "absolute",
+                                    borderRadius: "50%",
+                                    appearance: "none",
+                                    cursor: "pointer",
+                                  }}
+                                />
+                                <Avatar.Fallback
+                                  name={participant.label}
+                                  color="black"
+                                />
+                              </Avatar.Root>
+
+                              <label htmlFor={participant.label}>
+                                {participant.label}
+                              </label>
+                            </Flex>
+                          ))}
+                          <Field.ErrorText>
+                            {errors.splitBy && errors.splitBy.message}
+                          </Field.ErrorText>
+                        </Flex>
+                      ) : (
+                        <Text>No participants</Text>
+                      )}
+                    </Field.Root>
+                  </Flex>
+                </DrawerBody>
+                <DrawerFooter>
+                  <Flex
+                    justify={expense.id.length > 0 ? "space-between" : "center"}
+                    width="100%"
+                  >
+                    {expense.id.length > 0 && (
+                      <Dialog.Root role="alertdialog">
+                        <Dialog.Trigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            rounded="full"
+                            colorPalette="red"
                           >
-                            {participant.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </SelectRoot>
-                  )}
-                />
-              ) : (
-                <Text>No participants</Text>
-              )}
-            </Field>
-
-            <Field label="Split By">
-              {participants.length ? (
-                <Flex direction="column" justify="center" align="start" gap={2}>
-                  {splitByParticipants.map((participant) => (
-                    <Flex align="center" gap={2} key={participant.value}>
-                      <Avatar.Root
-                        bg={pickPalette(participant.value)}
-                        key={participant.value}
-                        variant="subtle"
-                        size="lg"
-                        onClick={() => toggleSelection(participant.value)}
-                        style={{
-                          cursor: "pointer",
-                          border: selectedValues.includes(participant.value)
-                            ? "2px solid lime"
-                            : "2px solid transparent",
-                          borderRadius: "50%",
-                        }}
+                            Delete
+                          </Button>
+                        </Dialog.Trigger>
+                        <Portal>
+                          <Dialog.Backdrop />
+                          <Dialog.Positioner>
+                            <Dialog.Content>
+                              <Dialog.Header>
+                                <Dialog.Title>
+                                  Delete {expense.title}?
+                                </Dialog.Title>
+                              </Dialog.Header>
+                              <Dialog.Body>
+                                <p>
+                                  Deleting expense will remove it from related
+                                  participants.
+                                </p>
+                              </Dialog.Body>
+                              <Dialog.Footer>
+                                <Dialog.ActionTrigger asChild>
+                                  <Button variant="outline" rounded="full">
+                                    Cancel
+                                  </Button>
+                                </Dialog.ActionTrigger>
+                                <Button
+                                  rounded="full"
+                                  colorPalette="red"
+                                  onClick={handleDeleteExpense}
+                                >
+                                  Delete
+                                </Button>
+                              </Dialog.Footer>
+                            </Dialog.Content>
+                          </Dialog.Positioner>
+                        </Portal>
+                      </Dialog.Root>
+                    )}
+                    <Flex gap={2}>
+                      <DrawerActionTrigger asChild>
+                        <Button variant="outline" rounded="full">
+                          Cancel
+                        </Button>
+                      </DrawerActionTrigger>
+                      <Button
+                        rounded="full"
+                        type="submit"
+                        disabled={Object.keys(errors).length > 0}
+                        loading={isSubmitting}
+                        loadingText="Saving..."
+                        spinnerPlacement="start"
+                        bgColor="lime.500"
                       >
-                        <input
-                          type="checkbox"
-                          id={participant.value}
-                          value={participant.value}
-                          {...register(`splitBy`)}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            position: "absolute",
-                            borderRadius: "50%",
-                            appearance: "none",
-                          }}
-                        />
-                        <Avatar.Fallback
-                          name={participant.label}
-                          color="black"
-                        />
-                      </Avatar.Root>
-
-                      <label htmlFor={participant.label}>
-                        {participant.label}
-                      </label>
+                        Save
+                      </Button>
                     </Flex>
-                  ))}
-                </Flex>
-              ) : (
-                <Text>No participants</Text>
-              )}
-            </Field>
-            {expense.id.length > 0 && (
-              <Button
-                onClick={handleDeleteExpense}
-                variant="outline"
-                colorPalette="red"
-              >
-                Delete
-              </Button>
-            )}
-          </DrawerBody>
-          <DrawerFooter>
-            <DrawerActionTrigger asChild>
-              <Button variant="outline">Cancel</Button>
-            </DrawerActionTrigger>
-            <Button type="submit">Save</Button>
-          </DrawerFooter>
-          <DrawerCloseTrigger />
-        </form>
+                  </Flex>
+                </DrawerFooter>
+              </Flex>
+              <DrawerCloseTrigger />
+            </Flex>
+          </form>
+        </Flex>
       </DrawerContent>
     </DrawerRoot>
   );

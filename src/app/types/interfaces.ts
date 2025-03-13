@@ -28,14 +28,6 @@ export interface Participant {
   transactions: Transaction[];
 }
 
-// // SharedDetail
-// export interface SplitDetail {
-//   id: string;
-//   expense: string;
-//   participant: string;
-//   amount: number;
-// }
-
 export interface ExpenseDetail {
   expenseId: string;
   amount: number;
