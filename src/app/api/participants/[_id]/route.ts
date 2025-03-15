@@ -2,9 +2,13 @@ import dbConnect from "../../../../lib/mongodb";
 import ParticipantModel from "../../../../../models/Participant";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET({ params }: { params: Promise<{ _id: string }> }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ _id: string }> }
+) {
   try {
     await dbConnect();
+    console.log("params", await params);
     const { _id } = await params;
 
     if (!_id) {
@@ -56,11 +60,13 @@ export async function PUT(
   }
 }
 
-export async function DELETE({ params }: { params: { _id: string } }) {
-  await dbConnect();
-
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ _id: string }> }
+) {
   try {
-    const { _id } = params;
+    await dbConnect();
+    const { _id } = await params;
     if (!_id) {
       console.error("No _id provided");
       return NextResponse.json({ success: false }, { status: 400 });

@@ -2,7 +2,10 @@ import dbConnect from "../../../../lib/mongodb";
 import ExpenseModel from "../../../../../models/Expense";
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET({ params }: { params: { _id: string } }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { _id: string } }
+) {
   try {
     await dbConnect();
     const { _id } = params;
@@ -26,17 +29,21 @@ export async function GET({ params }: { params: { _id: string } }) {
   }
 }
 
-export async function PUT(req: NextRequest) {
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ _id: string }> }
+) {
   console.log("PUT one expense");
 
   try {
     await dbConnect();
-    const body = await req.json();
-    const { _id, ...updateData } = body;
+
+    const { _id } = await params;
     if (!_id) {
       console.error("No _id provided");
       return NextResponse.json({ success: false }, { status: 400 });
     }
+    const updateData = await req.json();
     const updateExpense = await ExpenseModel.findByIdAndUpdate(_id, updateData);
 
     if (!updateExpense) {
@@ -50,11 +57,13 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-export async function DELETE({ params }: { params: { _id: string } }) {
-  await dbConnect();
-
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ _id: string }> }
+) {
   try {
-    const { _id } = params;
+    await dbConnect();
+    const { _id } = await params;
     if (!_id) {
       console.error("No _id provided");
       return NextResponse.json({ success: false }, { status: 400 });
