@@ -1,13 +1,13 @@
-export interface Group {
-  id: string;
-  code: string;
+export interface ExpenseGroup {
+  // id: string;
+  // code: string;
   title: string;
   note: string;
   expenses: string[];
-  subtotal: number;
-  taxRate: number;
-  taxAmount: number;
-  total: number;
+  // subtotal: number;
+  // taxRate: number;
+  // taxAmount: number;
+  // total: number;
   participants: string[];
 }
 
@@ -17,7 +17,7 @@ export interface Transaction {
 }
 
 export interface Participant {
-  id: string;
+  _id: string;
   firstName: string;
   lastName: string;
   paidExpenses: ExpenseDetail[];
@@ -40,7 +40,7 @@ export interface PaymentDetail {
 
 // Item
 export interface Expense {
-  id: string;
+  _id: string;
   title: string;
   note: string;
   paidBy: PaymentDetail;

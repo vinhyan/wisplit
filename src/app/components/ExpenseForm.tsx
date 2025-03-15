@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import {
   Flex,
@@ -78,7 +78,7 @@ export default function ExpenseForm({
       cost: expense.paidBy.amount,
       paidBy: [expense.paidBy.participantId],
       splitBy:
-        expense.id.length > 0
+        expense._id.length > 0
           ? expense.splitBy.map((splitBy) => splitBy.participantId)
           : [],
     },
@@ -88,9 +88,9 @@ export default function ExpenseForm({
   const participantsCollection = useMemo(() => {
     return createListCollection({
       items: participants.map((participant) => ({
-        id: participant.id,
+        id: participant._id,
         label: `${participant.firstName} ${participant.lastName}`,
-        value: participant.id,
+        value: participant._id,
       })),
     });
   }, [participants]);
@@ -99,7 +99,7 @@ export default function ExpenseForm({
   const splitByParticipants = useMemo(() => {
     const result = participants.map((participant) => ({
       label: `${participant.firstName} ${participant.lastName}`,
-      value: participant.id,
+      value: participant._id,
     }));
     return result;
   }, [participants]);
@@ -134,7 +134,7 @@ export default function ExpenseForm({
 
     // === paid participant ===
     const paidParticipant = participants.find(
-      (participant) => participant.id === expense.paidBy.participantId
+      (participant) => participant._id === expense.paidBy.participantId
     );
     if (!paidParticipant) {
       throw new Error(
@@ -143,7 +143,7 @@ export default function ExpenseForm({
     }
 
     const updatedPaidExpenses = paidParticipant.paidExpenses.filter(
-      (pe) => pe.expenseId !== expense.id
+      (pe) => pe.expenseId !== expense._id
     );
 
     paidParticipant.paidExpenses = updatedPaidExpenses;
@@ -154,13 +154,13 @@ export default function ExpenseForm({
     paidParticipant.balance =
       paidParticipant.paidTotal - paidParticipant.splitTotal;
     setParticipants((prev) =>
-      prev.map((p) => (p.id === paidParticipant.id ? paidParticipant : p))
+      prev.map((p) => (p._id === paidParticipant._id ? paidParticipant : p))
     );
 
     // === split participants ===
     for (let i = 0; i < expense.splitBy.length; i++) {
       const splitParticipant = participants.find(
-        (participant) => participant.id === expense.splitBy[i].participantId
+        (participant) => participant._id === expense.splitBy[i].participantId
       );
       if (!splitParticipant) {
         throw new Error(
@@ -169,7 +169,7 @@ export default function ExpenseForm({
       }
 
       const updatedSplitExpenses = splitParticipant.splitExpenses.filter(
-        (se) => se.expenseId !== expense.id
+        (se) => se.expenseId !== expense._id
       );
       splitParticipant.splitExpenses = updatedSplitExpenses;
       splitParticipant.splitTotal = splitParticipant.splitExpenses.reduce(
@@ -180,11 +180,11 @@ export default function ExpenseForm({
         splitParticipant.paidTotal - splitParticipant.splitTotal;
 
       setParticipants((prev) =>
-        prev.map((p) => (p.id === splitParticipant.id ? splitParticipant : p))
+        prev.map((p) => (p._id === splitParticipant._id ? splitParticipant : p))
       );
     }
 
-    setExpenses((prev) => prev.filter((e) => e.id !== expense.id));
+    setExpenses((prev) => prev.filter((e) => e._id !== expense._id));
 
     reset();
     setOpenExpenseForm(false);
@@ -207,7 +207,7 @@ export default function ExpenseForm({
     }));
 
     // new expense
-    if (!expense.id.length) {
+    if (!expense._id.length) {
       console.log("[NEW EXPENSE]");
       // === Paid person ===
       // 1. Get paid person, add this expense to their paidExpenses
@@ -227,7 +227,7 @@ export default function ExpenseForm({
 
       // === Paid person ===
       const paidPerson = participants.find(
-        (participant) => participant.id === newPaidByDetail.participantId
+        (participant) => participant._id === newPaidByDetail.participantId
       );
       if (!paidPerson) {
         throw new Error(
@@ -247,13 +247,14 @@ export default function ExpenseForm({
       );
       paidPerson.balance = paidPerson.paidTotal - paidPerson.splitTotal;
       setParticipants((prev) =>
-        prev.map((p) => (p.id === paidPerson.id ? paidPerson : p))
+        prev.map((p) => (p._id === paidPerson._id ? paidPerson : p))
       );
 
       // === Split participants ===
       for (let i = 0; i < newSplitByDetails.length; i++) {
         const splitParticipant = participants.find(
-          (participant) => participant.id === newSplitByDetails[i].participantId
+          (participant) =>
+            participant._id === newSplitByDetails[i].participantId
         );
         if (!splitParticipant) {
           throw new Error(
@@ -276,12 +277,14 @@ export default function ExpenseForm({
         splitParticipant.balance =
           splitParticipant.paidTotal - splitParticipant.splitTotal;
         setParticipants((prev) =>
-          prev.map((p) => (p.id === splitParticipant.id ? splitParticipant : p))
+          prev.map((p) =>
+            p._id === splitParticipant._id ? splitParticipant : p
+          )
         );
       }
 
       const newExpense: Expense = {
-        id: newExpenseId,
+        _id: newExpenseId,
         title,
         note,
         paidBy: newPaidByDetail,
@@ -320,7 +323,7 @@ export default function ExpenseForm({
       // ****** Paid person ******
       // === current paid person ===
       const currPaidPerson = participants.find(
-        (participant) => participant.id === expense.paidBy.participantId
+        (participant) => participant._id === expense.paidBy.participantId
       );
       if (!currPaidPerson) {
         throw new Error(
@@ -328,9 +331,9 @@ export default function ExpenseForm({
         );
       }
       // paidBy person is changed
-      if (currPaidPerson.id !== newPaidByDetail.participantId) {
+      if (currPaidPerson._id !== newPaidByDetail.participantId) {
         const updatedCurrPaidExpenses = currPaidPerson.paidExpenses.filter(
-          (pe) => pe.expenseId !== expense.id
+          (pe) => pe.expenseId !== expense._id
         );
         currPaidPerson.paidExpenses = updatedCurrPaidExpenses;
         currPaidPerson.paidTotal = currPaidPerson.paidExpenses.reduce(
@@ -340,12 +343,12 @@ export default function ExpenseForm({
         currPaidPerson.balance =
           currPaidPerson.paidTotal - currPaidPerson.splitTotal;
         setParticipants((prev) =>
-          prev.map((p) => (p.id === currPaidPerson.id ? currPaidPerson : p))
+          prev.map((p) => (p._id === currPaidPerson._id ? currPaidPerson : p))
         );
 
         // === new paid person ===
         const newPaidPerson = participants.find(
-          (participant) => participant.id === newPaidByDetail.participantId
+          (participant) => participant._id === newPaidByDetail.participantId
         );
         if (!newPaidPerson) {
           throw new Error(
@@ -356,7 +359,7 @@ export default function ExpenseForm({
         newPaidPerson.paidExpenses = [
           ...newPaidPerson.paidExpenses,
           {
-            expenseId: expense.id,
+            expenseId: expense._id,
             amount: cost,
           },
         ];
@@ -368,13 +371,13 @@ export default function ExpenseForm({
         newPaidPerson.balance =
           newPaidPerson.paidTotal - newPaidPerson.splitTotal;
         setParticipants((prev) =>
-          prev.map((p) => (p.id === newPaidPerson.id ? newPaidPerson : p))
+          prev.map((p) => (p._id === newPaidPerson._id ? newPaidPerson : p))
         );
       }
       // paidBy person is not changed, but the cost is changed
       else if (expense.paidBy.amount !== cost) {
         const updatedCurrPaidExpenses = currPaidPerson.paidExpenses.map((pe) =>
-          pe.expenseId == expense.id ? { ...pe, amount: cost } : pe
+          pe.expenseId == expense._id ? { ...pe, amount: cost } : pe
         );
         currPaidPerson.paidExpenses = updatedCurrPaidExpenses;
         currPaidPerson.paidTotal = currPaidPerson.paidExpenses.reduce(
@@ -384,7 +387,7 @@ export default function ExpenseForm({
         currPaidPerson.balance =
           currPaidPerson.paidTotal - currPaidPerson.splitTotal;
         setParticipants((prev) =>
-          prev.map((p) => (p.id === currPaidPerson.id ? currPaidPerson : p))
+          prev.map((p) => (p._id === currPaidPerson._id ? currPaidPerson : p))
         );
       }
 
@@ -399,7 +402,7 @@ export default function ExpenseForm({
       for (let i = 0; i < prevSplitParticipantIds.length; i++) {
         const prevSplitParticipant = participants.find(
           (participant) =>
-            participant.id === prevSplitParticipantIds[i].participantId
+            participant._id === prevSplitParticipantIds[i].participantId
         );
         if (!prevSplitParticipant) {
           throw new Error(
@@ -407,7 +410,7 @@ export default function ExpenseForm({
           );
         }
         const updatedSplitExpenses = prevSplitParticipant.splitExpenses.filter(
-          (se) => se.expenseId !== expense.id
+          (se) => se.expenseId !== expense._id
         );
         prevSplitParticipant.splitExpenses = updatedSplitExpenses;
         prevSplitParticipant.splitTotal =
@@ -419,7 +422,7 @@ export default function ExpenseForm({
           prevSplitParticipant.paidTotal - prevSplitParticipant.splitTotal;
         setParticipants((prev) =>
           prev.map((p) =>
-            p.id === prevSplitParticipant.id ? prevSplitParticipant : p
+            p._id === prevSplitParticipant._id ? prevSplitParticipant : p
           )
         );
       }
@@ -427,7 +430,8 @@ export default function ExpenseForm({
       // update or add splitExpenses to the new split participants
       for (let i = 0; i < newSplitByDetails.length; i++) {
         const newSplitParticipant = participants.find(
-          (participant) => participant.id === newSplitByDetails[i].participantId
+          (participant) =>
+            participant._id === newSplitByDetails[i].participantId
         );
         if (!newSplitParticipant) {
           throw new Error(
@@ -436,14 +440,14 @@ export default function ExpenseForm({
         }
 
         const splitExpenseFound = newSplitParticipant.splitExpenses.find(
-          (se) => se.expenseId === expense.id
+          (se) => se.expenseId === expense._id
         );
         // new split participant
         if (!splitExpenseFound) {
           newSplitParticipant.splitExpenses = [
             ...newSplitParticipant.splitExpenses,
             {
-              expenseId: expense.id,
+              expenseId: expense._id,
               amount: newSplitAmount,
             },
           ];
@@ -451,7 +455,7 @@ export default function ExpenseForm({
         else {
           const updatedSplitExpenses = newSplitParticipant.splitExpenses.map(
             (se) =>
-              se.expenseId === expense.id
+              se.expenseId === expense._id
                 ? { ...se, amount: newSplitAmount }
                 : se
           );
@@ -467,7 +471,7 @@ export default function ExpenseForm({
           newSplitParticipant.paidTotal - newSplitParticipant.splitTotal;
         setParticipants((prev) =>
           prev.map((p) =>
-            p.id === newSplitParticipant.id ? newSplitParticipant : p
+            p._id === newSplitParticipant._id ? newSplitParticipant : p
           )
         );
       }
@@ -480,7 +484,7 @@ export default function ExpenseForm({
         splitBy: newSplitByDetails,
       };
       setExpenses((prev) =>
-        prev.map((e) => (e.id === updatedExpense.id ? updatedExpense : e))
+        prev.map((e) => (e._id === updatedExpense._id ? updatedExpense : e))
       );
     }
 
@@ -505,7 +509,7 @@ export default function ExpenseForm({
             <Flex align="center" direction="column" rowGap={4}>
               <DrawerHeader>
                 <DrawerTitle>
-                  {expense.id.length > 0 ? expense.title : "New Expense"}
+                  {expense._id.length > 0 ? expense.title : "New Expense"}
                 </DrawerTitle>
               </DrawerHeader>
               <Flex direction="column" gap={4} width="100%" maxW="370px">
@@ -661,10 +665,12 @@ export default function ExpenseForm({
                 </DrawerBody>
                 <DrawerFooter>
                   <Flex
-                    justify={expense.id.length > 0 ? "space-between" : "center"}
+                    justify={
+                      expense._id.length > 0 ? "space-between" : "center"
+                    }
                     width="100%"
                   >
-                    {expense.id.length > 0 && (
+                    {expense._id.length > 0 && (
                       <Dialog.Root role="alertdialog">
                         <Dialog.Trigger asChild>
                           <Button

@@ -9,7 +9,6 @@ import {
   Button,
   Avatar,
   Field,
-  List,
   Link,
   Em,
 } from "@chakra-ui/react";
@@ -23,6 +22,8 @@ import {
   PaymentDetail,
 } from "@/app/types/interfaces";
 import { pickPalette } from "@/components/theme";
+import useSWR from "swr";
+import { apiFetcher } from "@/utils/apiFetcher";
 
 interface GroupInput {
   title: string;
@@ -40,7 +41,7 @@ interface GroupInput {
 // }
 
 const defaultParticipant: Participant = {
-  id: "",
+  _id: "",
   firstName: "",
   lastName: "",
   paidExpenses: [],
@@ -57,7 +58,7 @@ const defPaymentDetail: PaymentDetail = {
 };
 
 const defaultExpense: Expense = {
-  id: "",
+  _id: "",
   title: "",
   note: "",
   paidBy: defPaymentDetail,
@@ -69,8 +70,6 @@ export default function BillForm() {
     register,
     handleSubmit,
     reset,
-    setError,
-    clearErrors,
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<GroupInput>();
@@ -85,25 +84,51 @@ export default function BillForm() {
   const [selectedExpense, setSelectedExpense] =
     useState<Expense>(defaultExpense);
 
+  const {
+    data: participantsData,
+    isLoading: participantsLoading,
+    error: participantsError,
+  } = useSWR("/api/participants", apiFetcher);
+
   // const [numParticipants, setNumParticipants] = useState<number>(0);
   // const [numExpenses, setNumExpenses] = useState<number>(0);
 
   // useEffect(() => {
-  //   // setValue("participants", participants.length);
-  //   setNumParticipants(participants.length);
-  //   console.log("Num Participants", numParticipants);
-  //   console.log("Participants length", participants.length);
-  // }, [participants]);
+  //   setValue("participants", participants.length);
+  //   // setNumParticipants(participants.length);
+  //   // console.log("Num Participants", numParticipants);
+  //   // console.log("Participants length", participants.length);
+  // }, [participants, setValue]);
 
   // useEffect(() => {
-  //   // setValue("expenses", expenses.length);
-  //   setNumExpenses(expenses.length);
-  // }, [expenses]);
+  //   setValue("expenses", expenses.length);
+  //   // setNumExpenses(expenses.length);
+  // }, [expenses, setValue]);
 
   // const [isError, setIsError] = useState({
   //   participants: false,
   //   expenses: false,
   // });
+
+  // participants and expenses validation
+  useEffect(() => {
+    setValue("participants", participants.length, {
+      shouldTouch: true,
+    });
+    setValue("expenses", expenses.length, {
+      shouldTouch: true,
+    });
+  }, [setValue, participants, expenses, openParticipantForm, openExpenseForm]);
+
+  useEffect(() => {
+    if (participantsData) {
+      setParticipants(participantsData.data);
+    }
+  }, [participantsData]);
+
+  if (participantsError) {
+    return <div>Error loading participants</div>;
+  }
 
   const onSubmit: SubmitHandler<GroupInput> = (data) => {
     console.log("Expenses", expenses);
@@ -113,6 +138,8 @@ export default function BillForm() {
 
     // create new group and save to DB
     reset();
+    setParticipants([]);
+    setExpenses([]);
   };
 
   const handleNewParticipant = () => {
@@ -120,8 +147,24 @@ export default function BillForm() {
     setOpenParticipantForm(true);
   };
 
-  const handleUpdateParticipant = (participant: Participant) => {
-    setSelectedParticipant(participant);
+  const handleUpdateParticipant = async (participantId: string) => {
+    // setSelectedParticipant(participant);
+    try {
+      const res = await fetch(`/api/participants/${participantId}`, {
+        method: "GET",
+      });
+      const data = await res.json();
+      if (data.success) {
+        const participant = data.data;
+        console.log("Participant from DB", participant);
+        setSelectedParticipant(participant);
+        console.log("Selected Participant", selectedParticipant);
+      } else {
+        console.error("Error fetching participant", data);
+      }
+    } catch (error) {
+      console.error("Error updating participant", error);
+    }
     setOpenParticipantForm(true);
   };
 
@@ -204,7 +247,7 @@ export default function BillForm() {
         balance = creditor.balance + debtor.balance;
 
         const transaction: Transaction = {
-          recipientId: creditor.id,
+          recipientId: creditor._id,
           amount: Math.abs(debtor.balance),
         };
         debtor.transactions = [...debtor.transactions, transaction];
@@ -263,18 +306,18 @@ export default function BillForm() {
                 participants.map((participant) => {
                   return (
                     <Button
-                      key={participant.id}
+                      key={participant._id}
                       variant="plain"
                       p="0"
                       minW="auto"
                       onClick={() => {
-                        handleUpdateParticipant(participant);
+                        handleUpdateParticipant(participant._id);
                       }}
                     >
                       <Avatar.Root
                         variant="subtle"
                         size="lg"
-                        bg={pickPalette(participant.id)}
+                        bg={pickPalette(participant._id)}
                       >
                         <Avatar.Fallback
                           color="black"
@@ -305,7 +348,7 @@ export default function BillForm() {
             </Flex>
             <input
               style={{ display: "none" }}
-              value={participants.length}
+              // value={participants.length}
               {...register("participants", {
                 min: {
                   value: 1,
@@ -326,7 +369,7 @@ export default function BillForm() {
                     expenses.map((expense) => {
                       return (
                         <Link
-                          key={expense.id}
+                          key={expense._id}
                           color="lime.500"
                           textStyle="lg"
                           variant="underline"
@@ -367,7 +410,7 @@ export default function BillForm() {
             </Flex>
             <input
               style={{ display: "none" }}
-              value={expenses.length}
+              // value={expenses.length}
               {...register("expenses", {
                 min: {
                   value: 1,
@@ -380,11 +423,13 @@ export default function BillForm() {
             </Field.ErrorText>
           </Field.Root>
           <Button
+            disabled={Object.keys(errors).length > 0}
             type="submit"
             bgColor="lime.500"
             rounded="full"
             width="100%"
             maxWidth="150px"
+            loading={isSubmitting}
           >
             Split
           </Button>
@@ -400,6 +445,7 @@ export default function BillForm() {
           setExpenses={setExpenses}
           expenses={expenses}
           participants={participants}
+          // fetchParticipants={fetchParticipants}
         />
       )}
       {openExpenseForm && (

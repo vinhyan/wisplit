@@ -1,6 +1,6 @@
 "use client ";
 
-import { v4 as uuidv4 } from "uuid";
+// import { v4 as uuidv4 } from "uuid";
 import {
   Input,
   Button,
@@ -33,6 +33,7 @@ interface ParticipantFormProps {
   expenses: Expense[];
   setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
   participants: Participant[];
+  // fetchParticipants: () => void;
 }
 
 export default function ParticipantForm({
@@ -43,7 +44,8 @@ export default function ParticipantForm({
   expenses,
   setExpenses,
   participants,
-}: ParticipantFormProps) {
+}: // fetchParticipants,
+ParticipantFormProps) {
   const {
     register,
     handleSubmit,
@@ -51,28 +53,55 @@ export default function ParticipantForm({
     formState: { errors, isSubmitting },
   } = useForm<Participant>({
     defaultValues: {
-      id: participant.id,
+      _id: participant._id,
       firstName: participant.firstName,
       lastName: participant.lastName,
     },
   });
 
-  const onSubmit: SubmitHandler<Participant> = (data) => {
+  const onSubmit: SubmitHandler<Participant> = async (data) => {
     const { firstName, lastName } = data;
     const updatedParticipant = { ...participant, firstName, lastName };
 
-    // update participant
     console.log("2. SUBMIT PARTICIPANT");
-    if (updatedParticipant.id.length) {
+    // update participant
+    if (updatedParticipant._id.length) {
       console.log("2.1. Update participant", updatedParticipant);
+      const res = await fetch(`/api/participants/${updatedParticipant._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatedParticipant),
+      });
+
+      const resData = await res.json();
+      console.log("2.4. Update participant response", resData);
       setParticipants((prev) =>
         prev.map((p) =>
-          p.id === updatedParticipant.id ? updatedParticipant : p
+          p._id === updatedParticipant._id ? updatedParticipant : p
         )
       );
-    } else {
-      updatedParticipant.id = uuidv4();
+    }
+    // new participant
+    else {
+      // updatedParticipant._id = uuidv4();
       console.log("2.2. New participant", updatedParticipant);
+      try {
+        const res = await fetch("/api/participants", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedParticipant),
+        });
+
+        const resData = await res.json();
+
+        console.log("2.3. New participant response", resData);
+      } catch (error) {
+        console.error(error);
+      }
       setParticipants((prev) => [...prev, updatedParticipant]);
     }
 
@@ -80,7 +109,7 @@ export default function ParticipantForm({
     setOpenParticipantForm(false);
   };
 
-  const handleDeleteParticipant = () => {
+  const handleDeleteParticipant = async () => {
     // ** DELETE **
 
     // 1. Get the list of expenses this person paid (paidExpenses)
@@ -100,7 +129,7 @@ export default function ParticipantForm({
     const paidExpenses = participant.paidExpenses;
     for (let i = 0; i < paidExpenses.length; i++) {
       const paidExpense = expenses.find(
-        (e) => e.id === paidExpenses[i].expenseId
+        (e) => e._id === paidExpenses[i].expenseId
       );
       if (!paidExpense) {
         throw Error(`Expense ${paidExpenses[i].expenseId} cannot be found!`);
@@ -109,7 +138,7 @@ export default function ParticipantForm({
       const splitParticipants = paidExpense.splitBy;
       for (let j = 0; j < splitParticipants.length; j++) {
         const splitParticipant = participants.find(
-          (p) => p.id === splitParticipants[j].participantId
+          (p) => p._id === splitParticipants[j].participantId
         );
 
         if (!splitParticipant)
@@ -118,7 +147,7 @@ export default function ParticipantForm({
           );
 
         const updatedSplitExpenses = splitParticipant.splitExpenses.filter(
-          (se: ExpenseDetail) => se.expenseId !== paidExpense.id
+          (se: ExpenseDetail) => se.expenseId !== paidExpense._id
         );
 
         splitParticipant.splitExpenses = updatedSplitExpenses;
@@ -130,18 +159,18 @@ export default function ParticipantForm({
           splitParticipant.paidTotal - splitParticipant.splitTotal;
 
         const updatedParticipants = participants.map((p) =>
-          p.id === splitParticipant.id ? splitParticipant : p
+          p._id === splitParticipant._id ? splitParticipant : p
         );
 
         setParticipants(updatedParticipants);
       }
-      setExpenses((prev) => prev.filter((e) => e.id !== paidExpense.id));
+      setExpenses((prev) => prev.filter((e) => e._id !== paidExpense._id));
     }
 
     const splitExpenses = participant.splitExpenses;
     for (let i = 0; i < splitExpenses.length; i++) {
       const splitExpense = expenses.find(
-        (e) => e.id === splitExpenses[i].expenseId
+        (e) => e._id === splitExpenses[i].expenseId
       );
 
       if (!splitExpense)
@@ -153,7 +182,7 @@ export default function ParticipantForm({
       const newSplitAmount = splitExpense.paidBy.amount / newSplitCount;
 
       const updatedSplitBy = splitExpense.splitBy.filter((sb) => {
-        if (sb.participantId !== participant.id) {
+        if (sb.participantId !== participant._id) {
           sb.amount = newSplitAmount;
           return true;
         }
@@ -163,7 +192,7 @@ export default function ParticipantForm({
 
       for (let j = 0; j < splitExpense.splitBy.length; j++) {
         const splitParticipant = participants.find(
-          (p) => p.id === splitExpense.splitBy[j].participantId
+          (p) => p._id === splitExpense.splitBy[j].participantId
         );
 
         if (!splitParticipant)
@@ -173,7 +202,7 @@ export default function ParticipantForm({
 
         const updatedSplitExpenses = splitParticipant.splitExpenses.map(
           (se: ExpenseDetail) => {
-            if (se.expenseId === splitExpense.id) {
+            if (se.expenseId === splitExpense._id) {
               se = {
                 ...se,
                 amount: newSplitAmount,
@@ -191,16 +220,28 @@ export default function ParticipantForm({
           splitParticipant.paidTotal - splitParticipant.splitTotal;
 
         const updatedParticipants = participants.map((p) =>
-          p.id === splitParticipant.id ? splitParticipant : p
+          p._id === splitParticipant._id ? splitParticipant : p
         );
 
         setParticipants(updatedParticipants);
       }
       setExpenses((prev) =>
-        prev.map((e) => (e.id === splitExpense.id ? splitExpense : e))
+        prev.map((e) => (e._id === splitExpense._id ? splitExpense : e))
       );
     }
-    setParticipants((prev) => prev.filter((p) => p.id !== participant.id));
+    setParticipants((prev) => prev.filter((p) => p._id !== participant._id));
+    
+    // update database
+    try {
+      const res = await fetch(`/api/participants/${participant._id}`, {
+        method: "DELETE",
+      });
+
+      const resData = await res.json();
+      console.log("Delete participant response", resData);
+    } catch (error) {
+      console.error(error);
+    }
 
     reset();
     setOpenParticipantForm(false);
@@ -223,9 +264,9 @@ export default function ParticipantForm({
             <Flex align="center" direction="column" rowGap={4}>
               <DrawerHeader>
                 <DrawerTitle>
-                  {participant.id.length > 0 ? (
+                  {participant._id.length > 0 ? (
                     <Avatar.Root
-                      key={participant.id}
+                      key={participant._id}
                       variant="subtle"
                       size="lg"
                     >
@@ -268,11 +309,11 @@ export default function ParticipantForm({
                 <DrawerFooter>
                   <Flex
                     justify={
-                      participant.id.length > 0 ? "space-between" : "center"
+                      participant._id.length > 0 ? "space-between" : "center"
                     }
                     width="100%"
                   >
-                    {participant.id.length > 0 && (
+                    {participant._id.length > 0 && (
                       <Dialog.Root role="alertdialog">
                         <Dialog.Trigger asChild>
                           <Button

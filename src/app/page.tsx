@@ -6,7 +6,7 @@ export default function Home() {
     <Flex direction="column" align="center" justify="center" flex="1">
       <main>
         <Flex direction="column" align="center" justify="center">
-          <Button bgColor="lime.500" rounded="full" minW="150px">
+          <Button bgColor="lime.500" rounded="full" size="lg">
             <Link href="/groups/new">New Expense Group</Link>
           </Button>
           <Text>or</Text>
