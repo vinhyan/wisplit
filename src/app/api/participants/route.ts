@@ -28,6 +28,9 @@ export async function POST(req: NextRequest) {
   await dbConnect();
   try {
     const body = await req.json();
+    console.log("[PARTICIPANT POST] body", body);
+
+    // const { firstName, lastName } = body;
     const participant = await ParticipantModel.create(body);
     return NextResponse.json(
       { success: true, data: participant },

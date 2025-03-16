@@ -11,16 +11,12 @@ import {
   Field,
   Link,
   Em,
+  SkeletonCircle,
 } from "@chakra-ui/react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import ExpenseForm from "@/app/components/ExpenseForm";
 import ParticipantForm from "@/app/components/ParticipantForm";
-import {
-  Participant,
-  Expense,
-  Transaction,
-  PaymentDetail,
-} from "@/app/types/interfaces";
+import { Participant, Expense, Transaction } from "@/app/types/interfaces";
 import { pickPalette } from "@/components/theme";
 import useSWR from "swr";
 import { apiFetcher } from "@/utils/apiFetcher";
@@ -32,40 +28,7 @@ interface GroupInput {
   expenses: number;
 }
 
-// interface ExpenseFormInput {
-//   title: string;
-//   note: string;
-//   cost: number;
-//   paidBy: string; // participant id
-//   splitBy: string[];
-// }
-
-const defaultParticipant: Participant = {
-  _id: "",
-  firstName: "",
-  lastName: "",
-  paidExpenses: [],
-  splitExpenses: [],
-  balance: 0,
-  paidTotal: 0,
-  splitTotal: 0,
-  transactions: [],
-};
-
-const defPaymentDetail: PaymentDetail = {
-  participantId: "",
-  amount: 0,
-};
-
-const defaultExpense: Expense = {
-  _id: "",
-  title: "",
-  note: "",
-  paidBy: defPaymentDetail,
-  splitBy: [],
-};
-
-export default function BillForm() {
+export default function ExpenseGroup() {
   const {
     register,
     handleSubmit,
@@ -78,37 +41,24 @@ export default function BillForm() {
   const [openExpenseForm, setOpenExpenseForm] = useState(false);
 
   const [participants, setParticipants] = useState<Participant[]>([]);
-  const [selectedParticipant, setSelectedParticipant] =
-    useState<Participant>(defaultParticipant);
+  const [selectedParticipantId, setSelectedParticipantId] = useState<
+    string | null
+  >(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [selectedExpense, setSelectedExpense] =
-    useState<Expense>(defaultExpense);
+  const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
+    null
+  );
 
   const {
     data: participantsData,
     isLoading: participantsLoading,
     error: participantsError,
   } = useSWR("/api/participants", apiFetcher);
-
-  // const [numParticipants, setNumParticipants] = useState<number>(0);
-  // const [numExpenses, setNumExpenses] = useState<number>(0);
-
-  // useEffect(() => {
-  //   setValue("participants", participants.length);
-  //   // setNumParticipants(participants.length);
-  //   // console.log("Num Participants", numParticipants);
-  //   // console.log("Participants length", participants.length);
-  // }, [participants, setValue]);
-
-  // useEffect(() => {
-  //   setValue("expenses", expenses.length);
-  //   // setNumExpenses(expenses.length);
-  // }, [expenses, setValue]);
-
-  // const [isError, setIsError] = useState({
-  //   participants: false,
-  //   expenses: false,
-  // });
+  const {
+    data: expensesData,
+    isLoading: expensesLoading,
+    error: expensesError,
+  } = useSWR("/api/expenses", apiFetcher);
 
   // participants and expenses validation
   useEffect(() => {
@@ -126,8 +76,18 @@ export default function BillForm() {
     }
   }, [participantsData]);
 
+  useEffect(() => {
+    if (expensesData) {
+      setExpenses(expensesData.data);
+    }
+  }, [expensesData]);
+
   if (participantsError) {
     return <div>Error loading participants</div>;
+  }
+
+  if (expensesError) {
+    return <div>Error loading expenses</div>;
   }
 
   const onSubmit: SubmitHandler<GroupInput> = (data) => {
@@ -143,38 +103,22 @@ export default function BillForm() {
   };
 
   const handleNewParticipant = () => {
-    setSelectedParticipant(defaultParticipant);
+    setSelectedParticipantId(null);
     setOpenParticipantForm(true);
   };
 
   const handleUpdateParticipant = async (participantId: string) => {
-    // setSelectedParticipant(participant);
-    try {
-      const res = await fetch(`/api/participants/${participantId}`, {
-        method: "GET",
-      });
-      const data = await res.json();
-      if (data.success) {
-        const participant = data.data;
-        console.log("Participant from DB", participant);
-        setSelectedParticipant(participant);
-        console.log("Selected Participant", selectedParticipant);
-      } else {
-        console.error("Error fetching participant", data);
-      }
-    } catch (error) {
-      console.error("Error updating participant", error);
-    }
+    setSelectedParticipantId(participantId);
     setOpenParticipantForm(true);
   };
 
   const handleNewExpense = () => {
-    setSelectedExpense(defaultExpense);
+    setSelectedExpenseId(null);
     setOpenExpenseForm(true);
   };
 
-  const handleUpdateExpense = (expense: Expense) => {
-    setSelectedExpense(expense);
+  const handleUpdateExpense = (expenseId: string) => {
+    setSelectedExpenseId(expenseId);
     setOpenExpenseForm(true);
   };
 
@@ -301,8 +245,21 @@ export default function BillForm() {
           </Field.Root>
           <Field.Root invalid={!!errors.participants}>
             <Field.Label>Participants</Field.Label>
-            <Flex align="center" rowGap={2} columnGap={1} flexWrap={"wrap"}>
-              {participants.length > 0 &&
+            <Flex
+              align="center"
+              rowGap={2}
+              columnGap={1}
+              flexWrap={"wrap"}
+              width="full"
+            >
+              {participantsLoading ? (
+                <>
+                  <SkeletonCircle variant="pulse" size="12" />
+                  <SkeletonCircle variant="pulse" size="12" />
+                  <SkeletonCircle variant="pulse" size="12" />
+                </>
+              ) : (
+                participants.length > 0 &&
                 participants.map((participant) => {
                   return (
                     <Button
@@ -311,13 +268,13 @@ export default function BillForm() {
                       p="0"
                       minW="auto"
                       onClick={() => {
-                        handleUpdateParticipant(participant._id);
+                        handleUpdateParticipant(participant._id as string);
                       }}
                     >
                       <Avatar.Root
                         variant="subtle"
                         size="lg"
-                        bg={pickPalette(participant._id)}
+                        bg={pickPalette(participant._id as string)}
                       >
                         <Avatar.Fallback
                           color="black"
@@ -326,7 +283,8 @@ export default function BillForm() {
                       </Avatar.Root>
                     </Button>
                   );
-                })}
+                })
+              )}
               <Button
                 appearance="none"
                 variant="plain"
@@ -375,7 +333,7 @@ export default function BillForm() {
                           variant="underline"
                           cursor="pointer"
                           onClick={() => {
-                            handleUpdateExpense(expense);
+                            handleUpdateExpense(expense._id as string);
                           }}
                         >
                           {expense.title}
@@ -441,11 +399,10 @@ export default function BillForm() {
           setParticipants={setParticipants}
           openParticipantForm={openParticipantForm}
           setOpenParticipantForm={setOpenParticipantForm}
-          participant={selectedParticipant}
+          participantId={selectedParticipantId}
           setExpenses={setExpenses}
           expenses={expenses}
           participants={participants}
-          // fetchParticipants={fetchParticipants}
         />
       )}
       {openExpenseForm && (
@@ -453,7 +410,7 @@ export default function BillForm() {
           setExpenses={setExpenses}
           openExpenseForm={openExpenseForm}
           setOpenExpenseForm={setOpenExpenseForm}
-          expense={selectedExpense}
+          expenseId={selectedExpenseId}
           participants={participants}
           setParticipants={setParticipants}
         />

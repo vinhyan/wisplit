@@ -8,4 +8,4 @@ const ExpenseSchema = new mongoose.Schema({
 });
 
 export default mongoose.models.Expense ||
-  mongoose.model("Participant", ExpenseSchema);
+  mongoose.model("Expense", ExpenseSchema);

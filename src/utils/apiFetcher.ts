@@ -4,3 +4,4 @@ export const apiFetcher = async (uri: string) => {
   const response = await fetch(uri);
   return response.json();
 };
+

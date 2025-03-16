@@ -17,7 +17,7 @@ export interface Transaction {
 }
 
 export interface Participant {
-  _id: string;
+  _id?: string;
   firstName: string;
   lastName: string;
   paidExpenses: ExpenseDetail[];
@@ -40,7 +40,7 @@ export interface PaymentDetail {
 
 // Item
 export interface Expense {
-  _id: string;
+  _id?: string;
   title: string;
   note: string;
   paidBy: PaymentDetail;

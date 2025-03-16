@@ -33,7 +33,6 @@ const colorPalette = [
 ];
 
 export const pickPalette = (id: string) => {
-  const index = id.charCodeAt(0) % colorPalette.length;
+  const index = id.charCodeAt(id.length - 1) % colorPalette.length;
   return colorPalette[index];
 };
-
