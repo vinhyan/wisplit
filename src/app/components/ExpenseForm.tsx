@@ -16,9 +16,10 @@ import {
   Field,
   Dialog,
   Portal,
+  SkeletonText,
+  HStack,
 } from "@chakra-ui/react";
 import { useForm, SubmitHandler, Controller } from "react-hook-form";
-import { v4 as uuidv4 } from "uuid";
 import {
   DrawerActionTrigger,
   DrawerBackdrop,
@@ -47,15 +48,17 @@ import { useEffect, useState } from "react";
 import { mutate } from "swr";
 import useSWR from "swr";
 import { apiFetcher } from "@/utils/apiFetcher";
-import { createExpense, updateExpense } from "@/utils/expensesApi";
+import {
+  createExpense,
+  updateExpense,
+  deleteExpense,
+} from "@/utils/expensesApi";
 import { getParticipantById, updateParticipant } from "@/utils/participantsApi";
 
 interface ExpenseFormProps {
   participants: Participant[];
-  setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
   openExpenseForm: boolean;
   setOpenExpenseForm: React.Dispatch<React.SetStateAction<boolean>>;
-  setParticipants: React.Dispatch<React.SetStateAction<Participant[]>>;
   expenseId: string | null;
 }
 interface ExpenseFormValues {
@@ -76,16 +79,15 @@ const formDefaultValues: ExpenseFormValues = {
 
 export default function ExpenseForm({
   participants,
-  setExpenses,
   openExpenseForm,
   setOpenExpenseForm,
-  setParticipants,
   expenseId,
 }: ExpenseFormProps) {
-  const { data: expenseData, error } = useSWR(
-    expenseId ? `/api/expenses/${expenseId}` : null,
-    apiFetcher
-  );
+  const {
+    data: expenseData,
+    isLoading,
+    error,
+  } = useSWR(expenseId ? `/api/expenses/${expenseId}` : null, apiFetcher);
   const [expense, setExpense] = useState<Expense | null>(null);
   const {
     register,
@@ -129,7 +131,7 @@ export default function ExpenseForm({
   const splitByParticipants = useMemo(() => {
     const result = participants.map((participant) => ({
       label: `${participant.firstName} ${participant.lastName}`,
-      value: participant._id,
+      value: participant._id as string,
     }));
     return result;
   }, [participants]);
@@ -146,7 +148,7 @@ export default function ExpenseForm({
     setValue("splitBy", updatedValues);
   };
 
-  const handleDeleteExpense = () => {
+  const handleDeleteExpense = async () => {
     // ** DELETE **
     // === paid participant ===
     // 1. Get the paid participant by id
@@ -166,60 +168,73 @@ export default function ExpenseForm({
 
     // === paid participant ===
     if (!expense) return;
-    const paidParticipant = participants.find(
-      (participant) => participant._id === expense.paidBy.participantId
-    );
-    if (!paidParticipant) {
-      throw new Error(
-        `Paid participant ${expense.paidBy.participantId} not found`
+    // const paidParticipant = participants.find(
+    //   (participant) => participant._id === expense.paidBy.participantId
+    // );
+    // if (!paidParticipant) {
+    //   throw new Error(
+    //     `Paid participant ${expense.paidBy.participantId} not found`
+    //   );
+    // }
+    try {
+      const paidParticipant = await getParticipantById(
+        expense.paidBy.participantId
       );
-    }
 
-    const updatedPaidExpenses = paidParticipant.paidExpenses.filter(
-      (pe) => pe.expenseId !== expense._id
-    );
-
-    paidParticipant.paidExpenses = updatedPaidExpenses;
-    paidParticipant.paidTotal = paidParticipant.paidExpenses.reduce(
-      (acc, curr) => acc + curr.amount,
-      0
-    );
-    paidParticipant.balance =
-      paidParticipant.paidTotal - paidParticipant.splitTotal;
-    setParticipants((prev) =>
-      prev.map((p) => (p._id === paidParticipant._id ? paidParticipant : p))
-    );
-
-    // === split participants ===
-    for (let i = 0; i < expense.splitBy.length; i++) {
-      const splitParticipant = participants.find(
-        (participant) => participant._id === expense.splitBy[i].participantId
+      const updatedPaidExpenses = paidParticipant.paidExpenses.filter(
+        (pe: ExpenseDetail) => pe.expenseId !== expense._id
       );
-      if (!splitParticipant) {
-        throw new Error(
-          `Split participant ${expense.splitBy[i].participantId} not found`
-        );
-      }
 
-      const updatedSplitExpenses = splitParticipant.splitExpenses.filter(
-        (se) => se.expenseId !== expense._id
-      );
-      splitParticipant.splitExpenses = updatedSplitExpenses;
-      splitParticipant.splitTotal = splitParticipant.splitExpenses.reduce(
-        (acc, curr) => acc + curr.amount,
+      paidParticipant.paidExpenses = updatedPaidExpenses;
+      paidParticipant.paidTotal = paidParticipant.paidExpenses.reduce(
+        (acc: number, curr: ExpenseDetail) => acc + curr.amount,
         0
       );
-      splitParticipant.balance =
-        splitParticipant.paidTotal - splitParticipant.splitTotal;
+      paidParticipant.balance =
+        paidParticipant.paidTotal - paidParticipant.splitTotal;
+      // setParticipants((prev) =>
+      //   prev.map((p) => (p._id === paidParticipant._id ? paidParticipant : p))
+      // );
+      await updateParticipant(paidParticipant);
 
-      setParticipants((prev) =>
-        prev.map((p) => (p._id === splitParticipant._id ? splitParticipant : p))
-      );
+      // === split participants ===
+      for (let i = 0; i < expense.splitBy.length; i++) {
+        // const splitParticipant = participants.find(
+        //   (participant) => participant._id === expense.splitBy[i].participantId
+        // );
+        // if (!splitParticipant) {
+        //   throw new Error(
+        //     `Split participant ${expense.splitBy[i].participantId} not found`
+        //   );
+        // }
+        const splitParticipant = await getParticipantById(
+          expense.splitBy[i].participantId
+        );
+
+        const updatedSplitExpenses = splitParticipant.splitExpenses.filter(
+          (se: ExpenseDetail) => se.expenseId !== expense._id
+        );
+        splitParticipant.splitExpenses = updatedSplitExpenses;
+        splitParticipant.splitTotal = splitParticipant.splitExpenses.reduce(
+          (acc: number, curr: ExpenseDetail) => acc + curr.amount,
+          0
+        );
+        splitParticipant.balance =
+          splitParticipant.paidTotal - splitParticipant.splitTotal;
+
+        // setParticipants((prev) =>
+        //   prev.map((p) => (p._id === splitParticipant._id ? splitParticipant : p))
+        // );
+        await updateParticipant(splitParticipant);
+      }
+
+      // setExpenses((prev) => prev.filter((e) => e._id !== expense._id));
+      await deleteExpense(expense._id as string);
+    } catch (error) {
+      console.error(`Error deleting expense`, error);
     }
-
-    setExpenses((prev) => prev.filter((e) => e._id !== expense._id));
-
     mutate("/api/participants");
+    mutate("/api/expenses");
     reset();
     setOpenExpenseForm(false);
   };
@@ -228,7 +243,7 @@ export default function ExpenseForm({
     console.log("data", data);
 
     const { title, note, cost, paidBy, splitBy } = data;
-    console.log("paidBy", paidBy);
+    // console.log("paidBy", paidBy);
     const newExpenseCost = Number(cost);
     const newPaidByDetail: PaymentDetail = {
       participantId: paidBy[0],
@@ -574,10 +589,8 @@ export default function ExpenseForm({
         console.error(`Error updating expense`, error);
       }
     }
-
     mutate("/api/participants");
     mutate("/api/expenses");
-
     reset();
     setOpenExpenseForm(false);
   };
@@ -597,235 +610,257 @@ export default function ExpenseForm({
             style={{ width: "100%", maxWidth: "370px" }}
           >
             <Flex align="center" direction="column" rowGap={4}>
-              <DrawerHeader>
-                <DrawerTitle>
-                  {expense ? expense.title : "New Expense"}
-                </DrawerTitle>
-              </DrawerHeader>
-              <Flex direction="column" gap={4} width="100%" maxW="370px">
-                <DrawerBody>
-                  <Flex direction="column" gap={6}>
-                    <Field.Root invalid={!!errors.title}>
-                      <Field.Label>Title </Field.Label>
-                      <Input {...register("title", { required: "Required" })} />
-                      <Field.ErrorText>
-                        {errors.title && errors.title.message}
-                      </Field.ErrorText>
-                    </Field.Root>
-
-                    <Field.Root>
-                      <Field.Label>Note</Field.Label>
-                      <Textarea {...register("note")} />
-                    </Field.Root>
-
-                    <Field.Root invalid={!!errors.cost}>
-                      <Field.Label>Cost</Field.Label>
-                      <NumberInputRoot defaultValue="">
-                        <NumberInputField
-                          {...register("cost", {
-                            validate: (value) =>
-                              value > 0 || "Cost must be greater than 0",
-                          })}
-                        />
-                      </NumberInputRoot>
-                      <Field.ErrorText>
-                        {errors.cost && errors.cost.message}
-                      </Field.ErrorText>
-                    </Field.Root>
-
-                    <Field.Root invalid={!!errors.paidBy}>
-                      <Field.Label> Paid By</Field.Label>
-                      {participants.length ? (
-                        <>
-                          <Controller
-                            control={control}
-                            name="paidBy"
-                            rules={{
-                              validate: (value) =>
-                                (value && value[0].length > 0) || "Required",
-                            }}
-                            render={({ field }) => (
-                              <SelectRoot
-                                collection={participantsCollection}
-                                onValueChange={({ value }) =>
-                                  field.onChange(value)
-                                }
-                                onInteractOutside={() => field.onBlur()}
-                                size="lg"
-                                closeOnSelect
-                                positioning={{ placement: "top", flip: false }}
-                                name={field.name}
-                                value={field.value}
-                              >
-                                <SelectTrigger>
-                                  <SelectValueText placeholder="Paid by..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {participantsCollection.items.map(
-                                    (participant) => (
-                                      <SelectItem
-                                        item={participant}
-                                        key={participant.value}
-                                      >
-                                        {participant.label}
-                                      </SelectItem>
-                                    )
-                                  )}
-                                </SelectContent>
-                              </SelectRoot>
-                            )}
+              {isLoading ? (
+                <HStack width="full">
+                  <DrawerHeader>
+                    <SkeletonText noOfLines={2} gap="4" />
+                  </DrawerHeader>
+                  <DrawerBody>
+                    <SkeletonText noOfLines={8} gap="4" />
+                  </DrawerBody>
+                  <DrawerFooter>
+                    <SkeletonText noOfLines={2} gap="4" />
+                  </DrawerFooter>
+                </HStack>
+              ) : (
+                <>
+                  <DrawerHeader>
+                    <DrawerTitle>
+                      {expense ? expense.title : "New Expense"}
+                    </DrawerTitle>
+                  </DrawerHeader>
+                  <Flex direction="column" gap={4} width="100%" maxW="370px">
+                    <DrawerBody>
+                      <Flex direction="column" gap={6}>
+                        <Field.Root invalid={!!errors.title}>
+                          <Field.Label>Title </Field.Label>
+                          <Input
+                            {...register("title", { required: "Required" })}
                           />
                           <Field.ErrorText>
-                            {errors.paidBy && errors.paidBy.message}
+                            {errors.title && errors.title.message}
                           </Field.ErrorText>
-                        </>
-                      ) : (
-                        <Text>No participants</Text>
-                      )}
-                    </Field.Root>
+                        </Field.Root>
 
-                    <Field.Root invalid={!!errors.splitBy}>
-                      <Field.Label>Split By</Field.Label>
-                      {participants.length ? (
-                        <Flex
-                          direction="column"
-                          justify="center"
-                          align="start"
-                          gap={2}
-                        >
-                          {splitByParticipants.map((participant) => (
-                            <Flex
-                              align="center"
-                              gap={2}
-                              key={participant.value}
-                            >
-                              <Avatar.Root
-                                bg={
-                                  selectedValues.includes(participant.value)
-                                    ? pickPalette(participant.value)
-                                    : "gray"
-                                }
-                                key={participant.value}
-                                variant="subtle"
-                                size="lg"
-                                onClick={() =>
-                                  toggleSelection(participant.value)
-                                }
-                                style={{
-                                  cursor: "pointer",
-                                  borderRadius: "50%",
-                                }}
-                              >
-                                <input
-                                  type="checkbox"
-                                  id={participant.value}
-                                  value={participant.value}
-                                  {...register(`splitBy`, {
-                                    required: "Required",
-                                  })}
-                                  style={{
-                                    width: "100%",
-                                    height: "100%",
-                                    position: "absolute",
-                                    borderRadius: "50%",
-                                    appearance: "none",
-                                    cursor: "pointer",
-                                  }}
-                                />
-                                <Avatar.Fallback
-                                  name={participant.label}
-                                  color="black"
-                                />
-                              </Avatar.Root>
+                        <Field.Root>
+                          <Field.Label>Note</Field.Label>
+                          <Textarea {...register("note")} />
+                        </Field.Root>
 
-                              <label htmlFor={participant.label}>
-                                {participant.label}
-                              </label>
-                            </Flex>
-                          ))}
+                        <Field.Root invalid={!!errors.cost}>
+                          <Field.Label>Cost</Field.Label>
+                          <NumberInputRoot defaultValue="">
+                            <NumberInputField
+                              {...register("cost", {
+                                validate: (value) =>
+                                  value > 0 || "Cost must be greater than 0",
+                              })}
+                            />
+                          </NumberInputRoot>
                           <Field.ErrorText>
-                            {errors.splitBy && errors.splitBy.message}
+                            {errors.cost && errors.cost.message}
                           </Field.ErrorText>
-                        </Flex>
-                      ) : (
-                        <Text>No participants</Text>
-                      )}
-                    </Field.Root>
-                  </Flex>
-                </DrawerBody>
-                <DrawerFooter>
-                  <Flex
-                    justify={expense ? "space-between" : "center"}
-                    width="100%"
-                  >
-                    {expense && (
-                      <Dialog.Root role="alertdialog">
-                        <Dialog.Trigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            rounded="full"
-                            colorPalette="red"
-                          >
-                            Delete
-                          </Button>
-                        </Dialog.Trigger>
-                        <Portal>
-                          <Dialog.Backdrop />
-                          <Dialog.Positioner>
-                            <Dialog.Content>
-                              <Dialog.Header>
-                                <Dialog.Title>
-                                  Delete {expense.title}?
-                                </Dialog.Title>
-                              </Dialog.Header>
-                              <Dialog.Body>
-                                <p>
-                                  Deleting expense will remove it from related
-                                  participants.
-                                </p>
-                              </Dialog.Body>
-                              <Dialog.Footer>
-                                <Dialog.ActionTrigger asChild>
-                                  <Button variant="outline" rounded="full">
-                                    Cancel
-                                  </Button>
-                                </Dialog.ActionTrigger>
-                                <Button
-                                  rounded="full"
-                                  colorPalette="red"
-                                  onClick={handleDeleteExpense}
+                        </Field.Root>
+                        {/* Need to check validation of this field, when missing, it does not show form validation (error), but throws Error */}
+                        <Field.Root invalid={!!errors.paidBy}>
+                          <Field.Label> Paid By</Field.Label>
+                          {participants.length ? (
+                            <>
+                              <Controller
+                                control={control}
+                                name="paidBy"
+                                rules={{
+                                  validate: (value) =>
+                                    (value && value[0].length > 0) ||
+                                    "Required",
+                                }}
+                                render={({ field }) => (
+                                  <SelectRoot
+                                    collection={participantsCollection}
+                                    onValueChange={({ value }) =>
+                                      field.onChange(value)
+                                    }
+                                    onInteractOutside={() => field.onBlur()}
+                                    size="lg"
+                                    closeOnSelect
+                                    positioning={{
+                                      placement: "top",
+                                      flip: false,
+                                    }}
+                                    name={field.name}
+                                    value={field.value}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValueText placeholder="Paid by..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {participantsCollection.items.map(
+                                        (participant) => (
+                                          <SelectItem
+                                            item={participant}
+                                            key={participant.value}
+                                          >
+                                            {participant.label}
+                                          </SelectItem>
+                                        )
+                                      )}
+                                    </SelectContent>
+                                  </SelectRoot>
+                                )}
+                              />
+                              <Field.ErrorText>
+                                {errors.paidBy && errors.paidBy.message}
+                              </Field.ErrorText>
+                            </>
+                          ) : (
+                            <Text>No participants</Text>
+                          )}
+                        </Field.Root>
+
+                        <Field.Root invalid={!!errors.splitBy}>
+                          <Field.Label>Split By</Field.Label>
+                          {participants.length ? (
+                            <Flex
+                              direction="column"
+                              justify="center"
+                              align="start"
+                              gap={2}
+                            >
+                              {splitByParticipants.map((participant) => (
+                                <Flex
+                                  align="center"
+                                  gap={2}
+                                  key={participant.value}
                                 >
-                                  Delete
-                                </Button>
-                              </Dialog.Footer>
-                            </Dialog.Content>
-                          </Dialog.Positioner>
-                        </Portal>
-                      </Dialog.Root>
-                    )}
-                    <Flex gap={2}>
-                      <DrawerActionTrigger asChild>
-                        <Button variant="outline" rounded="full">
-                          Cancel
-                        </Button>
-                      </DrawerActionTrigger>
-                      <Button
-                        rounded="full"
-                        type="submit"
-                        disabled={Object.keys(errors).length > 0}
-                        loading={isSubmitting}
-                        loadingText="Saving..."
-                        spinnerPlacement="start"
-                        bgColor="lime.500"
+                                  <Avatar.Root
+                                    bg={
+                                      selectedValues.includes(participant.value)
+                                        ? pickPalette(participant.value)
+                                        : "gray"
+                                    }
+                                    key={participant.value}
+                                    variant="subtle"
+                                    size="lg"
+                                    onClick={() =>
+                                      toggleSelection(participant.value)
+                                    }
+                                    style={{
+                                      cursor: "pointer",
+                                      borderRadius: "50%",
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      id={participant.value}
+                                      value={participant.value}
+                                      {...register(`splitBy`, {
+                                        required: "Required",
+                                      })}
+                                      style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        position: "absolute",
+                                        borderRadius: "50%",
+                                        appearance: "none",
+                                        cursor: "pointer",
+                                      }}
+                                    />
+                                    <Avatar.Fallback
+                                      name={participant.label}
+                                      color="black"
+                                    />
+                                  </Avatar.Root>
+
+                                  <label htmlFor={participant.label}>
+                                    {participant.label}
+                                  </label>
+                                </Flex>
+                              ))}
+                              <Field.ErrorText>
+                                {errors.splitBy && errors.splitBy.message}
+                              </Field.ErrorText>
+                            </Flex>
+                          ) : (
+                            <Text>No participants</Text>
+                          )}
+                        </Field.Root>
+                      </Flex>
+                    </DrawerBody>
+                    <DrawerFooter>
+                      <Flex
+                        justify={expense ? "space-between" : "center"}
+                        width="100%"
                       >
-                        Save
-                      </Button>
-                    </Flex>
+                        {expense && (
+                          <Dialog.Root role="alertdialog">
+                            <Dialog.Trigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                rounded="full"
+                                colorPalette="red"
+                              >
+                                Delete
+                              </Button>
+                            </Dialog.Trigger>
+                            <Portal>
+                              <Dialog.Backdrop />
+                              <Dialog.Positioner>
+                                <Dialog.Content>
+                                  <Dialog.Header>
+                                    <Dialog.Title>
+                                      Delete {expense.title}?
+                                    </Dialog.Title>
+                                  </Dialog.Header>
+                                  <Dialog.Body>
+                                    <p>
+                                      Deleting expense will remove it from
+                                      related participants.
+                                    </p>
+                                  </Dialog.Body>
+                                  <Dialog.Footer>
+                                    <Dialog.ActionTrigger asChild>
+                                      <Button variant="outline" rounded="full">
+                                        Cancel
+                                      </Button>
+                                    </Dialog.ActionTrigger>
+                                    <Button
+                                      rounded="full"
+                                      colorPalette="red"
+                                      onClick={handleDeleteExpense}
+                                    >
+                                      Delete
+                                    </Button>
+                                  </Dialog.Footer>
+                                </Dialog.Content>
+                              </Dialog.Positioner>
+                            </Portal>
+                          </Dialog.Root>
+                        )}
+                        <Flex gap={2}>
+                          <DrawerActionTrigger asChild>
+                            <Button variant="outline" rounded="full">
+                              Cancel
+                            </Button>
+                          </DrawerActionTrigger>
+                          <Button
+                            rounded="full"
+                            type="submit"
+                            disabled={Object.keys(errors).length > 0}
+                            loading={isSubmitting}
+                            loadingText="Saving..."
+                            spinnerPlacement="start"
+                            bgColor="lime.500"
+                          >
+                            Save
+                          </Button>
+                        </Flex>
+                      </Flex>
+                    </DrawerFooter>
                   </Flex>
-                </DrawerFooter>
-              </Flex>
-              <DrawerCloseTrigger />
+                  <DrawerCloseTrigger />
+                </>
+              )}
             </Flex>
           </form>
         </Flex>

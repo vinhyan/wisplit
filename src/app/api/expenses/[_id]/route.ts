@@ -4,11 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { _id: string } }
+  { params }: { params: Promise<{ _id: string }> }
 ) {
   try {
     await dbConnect();
-    const { _id } = params;
+    const { _id } = await params;
 
     if (!_id) {
       console.error("No _id provided");

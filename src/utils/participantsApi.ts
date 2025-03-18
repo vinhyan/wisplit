@@ -14,6 +14,22 @@ const apiUrl = "/api/participants";
 //     console.error("Error fetching participants", error);
 //   }
 // };
+export const getParticipantsByIds = async (ids: string[]) => {
+  if (!ids || ids.length === 0) throw new Error("No ids provided");
+  const participantIds = ids.join(",");
+  try {
+    const res = await fetch(`${apiUrl}?ids=${participantIds}`, {
+      method: "GET",
+    });
+    const resData = await res.json();
+    if (!resData.success) {
+      throw new Error(`Cannot get participants by ids ${ids}`);
+    }
+    return resData.data;
+  } catch (error) {
+    console.error(`Error fetching participants by ids ${ids}`, error);
+  }
+};
 
 export const getParticipantById = async (id: string) => {
   try {
@@ -65,6 +81,12 @@ export const updateParticipant = async (participantData: Participant) => {
   }
 };
 
-export const deleteParticipant = async (participant: Participant) => {
-  console.log("deleteParticipant", participant);
+export const deleteParticipant = async (id: string) => {
+  try {
+    const res = await fetch(`${apiUrl}/${id}`, { method: "DELETE" });
+    const resData = await res.json();
+    return resData;
+  } catch (error) {
+    console.error(`Error deleting participant with id ${id}`, error);
+  }
 };

@@ -1,13 +1,7 @@
 export interface ExpenseGroup {
-  // id: string;
-  // code: string;
   title: string;
   note: string;
   expenses: string[];
-  // subtotal: number;
-  // taxRate: number;
-  // taxAmount: number;
-  // total: number;
   participants: string[];
 }
 

@@ -16,10 +16,12 @@ import {
 import { useForm, SubmitHandler } from "react-hook-form";
 import ExpenseForm from "@/app/components/ExpenseForm";
 import ParticipantForm from "@/app/components/ParticipantForm";
-import { Participant, Expense, Transaction } from "@/app/types/interfaces";
+import { Participant, Expense, Transaction, ExpenseGroup } from "@/app/types/interfaces";
 import { pickPalette } from "@/components/theme";
-import useSWR from "swr";
+import useSWR, { mutate } from "swr";
 import { apiFetcher } from "@/utils/apiFetcher";
+import { updateParticipant } from "@/utils/participantsApi";
+import { createExpenseGroup } from "@/utils/expenseGroupApi";
 
 interface GroupInput {
   title: string;
@@ -28,7 +30,7 @@ interface GroupInput {
   expenses: number;
 }
 
-export default function ExpenseGroup() {
+export default function GroupForm() {
   const {
     register,
     handleSubmit,
@@ -90,16 +92,32 @@ export default function ExpenseGroup() {
     return <div>Error loading expenses</div>;
   }
 
-  const onSubmit: SubmitHandler<GroupInput> = (data) => {
+  const onSubmit: SubmitHandler<GroupInput> = async (data) => {
     console.log("Expenses", expenses);
     console.log("Participants", participants);
 
-    splitExpenseGroup();
+    const { title, note } = data;
+
+    try {
+      await splitExpenseGroup();
+
+      const newGroupData: ExpenseGroup = {
+        title,
+        note,
+        expenses: expenses.map((expense) => expense._id as string),
+        participants: participants.map((participant) => participant._id as string),
+      };
+
+      const newExpenseGroup = await createExpenseGroup(newGroupData);
+      console.log("New expense group", newExpenseGroup);
+
+    } catch (error) {
+      console.error("Error submitting expense group", error);
+    }
 
     // create new group and save to DB
     reset();
-    setParticipants([]);
-    setExpenses([]);
+
   };
 
   const handleNewParticipant = () => {
@@ -122,7 +140,7 @@ export default function ExpenseGroup() {
     setOpenExpenseForm(true);
   };
 
-  const splitExpenseGroup = () => {
+  const splitExpenseGroup = async () => {
     // For each participant:
     //    calculate the total amount paid
     //    calculate the total amount split
@@ -179,43 +197,51 @@ export default function ExpenseGroup() {
     if (netBalance !== 0) {
       throw Error("Net balance is not zero!");
     }
+    try {
+      let balance = 0;
+      let j = 0;
+      for (let i = 0; i < creditors.length; i++) {
+        const creditor = creditors[i];
+        // console.log("Creditor", creditor);
+        for (; j < debtors.length; j++) {
+          const debtor = debtors[j];
+          // console.log("Debtor", debtor);
+          balance = creditor.balance + debtor.balance;
 
-    let balance = 0;
-    let j = 0;
-    for (let i = 0; i < creditors.length; i++) {
-      const creditor = creditors[i];
-      console.log("Creditor", creditor);
-      for (; j < debtors.length; j++) {
-        const debtor = debtors[j];
-        console.log("Debtor", debtor);
-        balance = creditor.balance + debtor.balance;
+          const transaction: Transaction = {
+            recipientId: creditor._id as string,
+            amount: Math.abs(debtor.balance),
+          };
+          debtor.transactions = [...debtor.transactions, transaction];
 
-        const transaction: Transaction = {
-          recipientId: creditor._id,
-          amount: Math.abs(debtor.balance),
-        };
-        debtor.transactions = [...debtor.transactions, transaction];
-
-        // debtor is settled
-        if (balance > 0) {
-          debtor.balance = 0;
-          creditor.balance = balance;
-        }
-        // creditor is settled
-        else if (balance < 0) {
-          debtor.balance = balance;
-          creditor.balance = 0;
-          break;
-        }
-        // both are settled
-        else {
-          debtor.balance = 0;
-          creditor.balance = 0;
+          // debtor is settled
+          if (balance > 0) {
+            debtor.balance = 0;
+            creditor.balance = balance;
+          }
+          // creditor is settled
+          else if (balance < 0) {
+            debtor.balance = balance;
+            creditor.balance = 0;
+            await updateParticipant(debtor);
+            await updateParticipant(creditor);
+            break;
+          }
+          // both are settled
+          else {
+            debtor.balance = 0;
+            creditor.balance = 0;
+          }
+          await updateParticipant(debtor);
+          await updateParticipant(creditor);
         }
       }
+    } catch (error) {
+      console.error("Error splitting expenses", error);
     }
+    mutate("/api/participants");
 
-    setParticipants([...debtors, ...creditors]);
+    // setParticipants([...debtors, ...creditors]);
   };
 
   return (
@@ -396,23 +422,23 @@ export default function ExpenseGroup() {
 
       {openParticipantForm && (
         <ParticipantForm
-          setParticipants={setParticipants}
+          // setParticipants={setParticipants}
           openParticipantForm={openParticipantForm}
           setOpenParticipantForm={setOpenParticipantForm}
           participantId={selectedParticipantId}
-          setExpenses={setExpenses}
-          expenses={expenses}
-          participants={participants}
+        // setExpenses={setExpenses}
+        // expenses={expenses}
+        // participants={participants}
         />
       )}
       {openExpenseForm && (
         <ExpenseForm
-          setExpenses={setExpenses}
+          // setExpenses={setExpenses}
           openExpenseForm={openExpenseForm}
           setOpenExpenseForm={setOpenExpenseForm}
           expenseId={selectedExpenseId}
           participants={participants}
-          setParticipants={setParticipants}
+        // setParticipants={setParticipants}
         />
       )}
     </Flex>

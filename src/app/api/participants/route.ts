@@ -3,12 +3,22 @@ import ParticipantModel from "../../../../models/Participant";
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/utils/logger";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   console.log("GET all participants");
 
-  await dbConnect();
   try {
-    const participants = await ParticipantModel.find({});
+    await dbConnect();
+    const { searchParams } = new URL(req.url);
+    const ids = searchParams.get("ids");
+    let participants;
+    if (!ids) {
+      participants = await ParticipantModel.find({});
+    } else {
+      const participantIds = ids.split(",");
+      participants = await ParticipantModel.find({
+        _id: { $in: participantIds },
+      });
+    }
     return NextResponse.json({ success: true, data: participants });
   } catch (error) {
     console.error(error);
@@ -25,8 +35,8 @@ export async function POST(req: NextRequest) {
 
   console.log("POST a participant");
 
-  await dbConnect();
   try {
+    await dbConnect();
     const body = await req.json();
     console.log("[PARTICIPANT POST] body", body);
 

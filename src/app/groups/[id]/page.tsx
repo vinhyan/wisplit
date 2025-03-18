@@ -12,78 +12,83 @@ import {
 } from "@chakra-ui/react";
 import { useState, useEffect } from "react";
 import { Participant, Expense, Group } from "@/app/types/interfaces";
+import useSWR, { mutate } from "swr";
+import { apiFetcher } from "@/utils/apiFetcher";
+import { getParticipantsByIds } from "@/utils/participantsApi";
+import { getExpensesByIds } from "@/utils/expensesApi";
+import { useParams } from 'next/navigation'
 
 import { pickPalette } from "@/components/theme";
 
-export default function GroupExpense() {
+export default function Group() {
+  const params = useParams();
+  const {
+    data: expenseGroupData,
+    isLoading: expenseGroupLoading,
+    error: expenseGroupError,
+  } = useSWR(`/api/expenseGroups/${params.id}`, apiFetcher);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [group, setGroup] = useState<Group>();
+  const [group, setGroup] = useState<Group>(null);
 
   useEffect(() => {
-    setParticipants([
-      {
-        id: "1",
-        firstName: "John",
-        lastName: "Doe",
-        paidExpenses: [],
-        splitExpenses: [],
-        balance: 0,
-        paidTotal: 0,
-        splitTotal: 0,
-        transactions: [],
-      },
-      {
-        id: "2",
-        firstName: "Peter",
-        lastName: "Lee",
-        paidExpenses: [],
-        splitExpenses: [],
-        balance: 0,
-        paidTotal: 0,
-        splitTotal: 0,
-        transactions: [],
-      },
-    ]);
-  }, []);
+    console.log("expenseGroupData", expenseGroupData);
+    if (expenseGroupData) {
+      const expenseGroup = expenseGroupData.data;
 
-  useEffect(() => {
-    setExpenses([
-      {
-        id: "3",
-        title: "Expense 1",
-        note: "Note 1",
-        paidBy: { participantId: "1", amount: 100 },
-        splitBy: [
-          { participantId: "1", amount: 50 },
-          { participantId: "2", amount: 50 },
-        ],
-      },
-      {
-        id: "4",
-        title: "Expense 2",
-        note: "Note 2",
-        paidBy: { participantId: "2", amount: 200 },
-        splitBy: [
-          { participantId: "1", amount: 100 },
-          { participantId: "2", amount: 100 },
-        ],
-      },
-    ]);
-  }, []);
+      setGroup(expenseGroup);
+      getParticipants(expenseGroup.participants);
+      getExpenses(expenseGroup.expenses);
+      // console.log("participantsFromDB", participantsFromDB);
+      async function getParticipants(ids: string[]) {
+        try {
+          const participants = await getParticipantsByIds(ids);
+          setParticipants(participants);
+        } catch (error) {
+          console.error(`Error fetching participants by ids ${ids}`, error);
+        }
+      }
+      async function getExpenses(ids: string[]) {
+        try {
+          const expenses = await getExpensesByIds(ids);
+          setExpenses(expenses);
+        } catch (error) {
+          console.error(`Error fetching expenses by ids ${ids}`, error);
+        }
+      }
+    }
+  }, [expenseGroupData]);
+
+  const getParticipantInfo = (id: string) => {
+    return participants.find((participant) => participant._id === id);
+  }
+
+  const showSettlements = () => {
+    return <>{participants.map((p) => {
+      if (p.transactions.length) {
+        return p.transactions.map((t, idx) => {
+          const recipient = getParticipantInfo(t.recipientId);
+          return <Text key={`${recipient?._id}-${idx}`}>{p.firstName} {p.lastName} &#128073; {recipient?.firstName} {recipient?.lastName}: {t.amount}</Text>
+        })
+      }
+    })}
+    </>
+  }
+
+  if (expenseGroupError) <div>Failed loading group expense.</div>;
 
   return (
     <Flex align="center" direction="column" flex="1">
       <Heading py={6} as="h2" textStyle="2xl">
-        Group Expense Title
+        {group?.title}
       </Heading>
       <Flex direction="column" width="100%" maxW="370px" gap={10}>
-        <Flex direction="column" gap={2}>
+        {group?.note && <Flex direction="column" gap={2}>
           <Heading as="h3" fontWeight="light" textStyle="md" color="lime.500">
             Note
           </Heading>
-          <Text textStyle="xl">Some note</Text>
-        </Flex>
+          <Text textStyle="xl">{group?.note}</Text>
+        </Flex>}
         <Flex direction="column" gap={4}>
           <Heading as="h3" fontWeight="light" textStyle="md" color="lime.500">
             Participants
@@ -92,11 +97,11 @@ export default function GroupExpense() {
             {participants.length > 0 &&
               participants.map((participant) => {
                 return (
-                  <HStack key={participant.id} gap="4">
+                  <HStack key={participant._id as string} gap="4">
                     <Avatar.Root
                       variant="subtle"
                       size="lg"
-                      bg={pickPalette(participant.id)}
+                      bg={pickPalette(participant._id as string)}
                     >
                       <Avatar.Fallback
                         color="black"
@@ -123,16 +128,28 @@ export default function GroupExpense() {
             <Accordion.Root multiple defaultValue={["b"]}>
               {expenses.length > 0 &&
                 expenses.map((expense) => {
+                  const paidBy = getParticipantInfo(expense.paidBy.participantId);
                   return (
-                    <Accordion.Item key={expense.id} value={expense.id}>
+                    <Accordion.Item key={expense._id as string} value={expense._id as string}>
                       <Accordion.ItemTrigger>
                         <Span>{expense.title}</Span>
                         <Accordion.ItemIndicator />
                       </Accordion.ItemTrigger>
                       <Accordion.ItemContent>
                         <Accordion.ItemBody>
-                          Cost: {expense.paidBy.amount}
-                          Paid by: {expense.paidBy.participantId}
+                          <Text>Cost: {expense.paidBy.amount}</Text>
+                          <Text>Paid by: {paidBy?.firstName} {paidBy?.lastName}</Text>
+                          <ul>
+                            <Text>Split by:</Text>
+                            {expense.splitBy.map((split) => {
+                              const participant = getParticipantInfo(split.participantId);
+                              return (
+                                <li key={split.participantId}>
+                                  {participant?.firstName} {participant?.lastName}: {split.amount}
+                                </li>
+                              );
+                            })}
+                          </ul>
                         </Accordion.ItemBody>
                       </Accordion.ItemContent>
                     </Accordion.Item>
@@ -145,6 +162,7 @@ export default function GroupExpense() {
           <Heading as="h3" fontWeight="light" textStyle="md" color="lime.500">
             Settlements
           </Heading>
+          {showSettlements()}
         </Flex>
       </Flex>
     </Flex>
