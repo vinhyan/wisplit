@@ -4,27 +4,59 @@ import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/utils/logger";
 
 export async function GET(req: NextRequest) {
-  console.log("GET all participants");
+  console.log("GET all participants from a group expense");
 
   try {
     await dbConnect();
     const { searchParams } = new URL(req.url);
-    const ids = searchParams.get("ids");
-    let participants;
-    if (!ids) {
-      participants = await ParticipantModel.find({});
-    } else {
-      const participantIds = ids.split(",");
-      participants = await ParticipantModel.find({
-        _id: { $in: participantIds },
-      });
+    const groupId = searchParams.get("groupId");
+
+    if (!groupId) {
+      console.error("No group ID provided");
+      return NextResponse.json({ success: false }, { status: 404 });
+      // participants = await ParticipantModel.find({});
     }
+
+    const participants = await ParticipantModel.find({
+      expenseGroupId: { $in: groupId },
+    });
+
     return NextResponse.json({ success: true, data: participants });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ success: false }, { status: 400 });
   }
 }
+
+// export async function GET(
+//   req: NextRequest
+//   // { params }: { params: Promise<{ groupId: string }> }
+// ) {
+//   console.log("GET all participants");
+
+//   try {
+//     await dbConnect();
+//     const { searchParams } = new URL(req.url);
+//     // const { searchParams } = new URL(req.url);
+//     // const ids = searchParams.get("ids");
+//     const groupId = searchParams.get("groupId");
+//     console.log("groupId", groupId);
+//     let participants;
+//     if (!groupId) {
+//       // participants = await ParticipantModel.find({});
+//       throw new Error("No group ID provided");
+//     } else {
+//       // const participantIds = ids.split(",");
+//       participants = await ParticipantModel.find({
+//         $or: [{ expenseGroupId: groupId }, { draftId: groupId }],
+//       });
+//     }
+//     return NextResponse.json({ success: true, data: participants });
+//   } catch (error) {
+//     console.error(error);
+//     return NextResponse.json({ success: false }, { status: 400 });
+//   }
+// }
 
 export async function POST(req: NextRequest) {
   const log = logger.child({

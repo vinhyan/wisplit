@@ -60,6 +60,7 @@ interface ExpenseFormProps {
   openExpenseForm: boolean;
   setOpenExpenseForm: React.Dispatch<React.SetStateAction<boolean>>;
   expenseId: string | null;
+  expenseGroupId: string;
 }
 interface ExpenseFormValues {
   title: string;
@@ -82,6 +83,7 @@ export default function ExpenseForm({
   openExpenseForm,
   setOpenExpenseForm,
   expenseId,
+  expenseGroupId
 }: ExpenseFormProps) {
   const {
     data: expenseData,
@@ -279,6 +281,7 @@ export default function ExpenseForm({
         note,
         paidBy: newPaidByDetail,
         splitBy: newSplitByDetails,
+        expenseGroupId
       };
 
       try {
@@ -589,8 +592,8 @@ export default function ExpenseForm({
         console.error(`Error updating expense`, error);
       }
     }
-    mutate("/api/participants");
-    mutate("/api/expenses");
+    mutate(`/api/participants?groupId=${expenseGroupId}`);
+    mutate(`/api/expenses?groupId=${expenseGroupId}`);
     reset();
     setOpenExpenseForm(false);
   };

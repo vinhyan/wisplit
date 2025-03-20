@@ -30,3 +30,20 @@ export const createExpenseGroup = async (expenseGroupData: ExpenseGroup) => {
     console.error(`Error creating expense group`, error);
   }
 };
+
+export const updateExpenseGroup = async (groupData: ExpenseGroup) => {
+  try {
+    const res = await fetch(`${apiUrl}/${groupData._id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(groupData),
+    });
+
+    const resData = await res.json();
+    return resData;
+  } catch (error) {
+    console.error(`Error updating expense group`, error);
+  }
+};

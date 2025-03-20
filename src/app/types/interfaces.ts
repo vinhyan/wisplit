@@ -1,4 +1,5 @@
 export interface ExpenseGroup {
+  _id?: string;
   title: string;
   note: string;
   expenses: string[];
@@ -12,6 +13,8 @@ export interface Transaction {
 
 export interface Participant {
   _id?: string;
+  expenseGroupId: string;
+  localId?: string;
   firstName: string;
   lastName: string;
   paidExpenses: ExpenseDetail[];
@@ -35,6 +38,8 @@ export interface PaymentDetail {
 // Item
 export interface Expense {
   _id?: string;
+  expenseGroupId: string;
+  localId?: string;
   title: string;
   note: string;
   paidBy: PaymentDetail;

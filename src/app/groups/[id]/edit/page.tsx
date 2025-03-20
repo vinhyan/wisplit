@@ -21,14 +21,15 @@ import { pickPalette } from "@/components/theme";
 import useSWR, { mutate } from "swr";
 import { apiFetcher } from "@/utils/apiFetcher";
 import { updateParticipant } from "@/utils/participantsApi";
-import { createExpenseGroup } from "@/utils/expenseGroupApi";
-import { v4 as uuidv4 } from 'uuid';
+import { updateExpenseGroup } from "@/utils/expenseGroupApi";
+// import { v4 as uuidv4 } from 'uuid';
 import { useRouter } from 'next/navigation'
-import mongoose from "mongoose";
+import { useParams } from 'next/navigation'
 
-interface GroupFormProps {
-  groupId?: string;
-}
+
+// interface GroupFormProps {
+//   groupId?: string;
+// }
 
 interface GroupInput {
   title: string;
@@ -37,7 +38,10 @@ interface GroupInput {
   expenses: number;
 }
 
-export default function GroupForm({ groupId }: GroupFormProps) {
+export default function GroupEdit() {
+  const params = useParams();
+  const expenseGroupId = params.id as string;
+  // console.log("[expenseGroupId]", expenseGroupId);
   const {
     register,
     handleSubmit,
@@ -50,6 +54,13 @@ export default function GroupForm({ groupId }: GroupFormProps) {
   const [openParticipantForm, setOpenParticipantForm] = useState(false);
   const [openExpenseForm, setOpenExpenseForm] = useState(false);
 
+  const [expenseGroup, setExpenseGroup] = useState<ExpenseGroup>({
+    title: "",
+    note: "",
+    participants: [],
+    expenses: [],
+  });
+
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [selectedParticipantId, setSelectedParticipantId] = useState<
     string | null
@@ -58,20 +69,33 @@ export default function GroupForm({ groupId }: GroupFormProps) {
   const [selectedExpenseId, setSelectedExpenseId] = useState<string | null>(
     null
   );
-  const [draftId, setDraftId] = useState(() => uuidv4());
 
-  console.log("draftId", draftId);
+  const {
+    data: expenseGroupData,
+    isLoading: expenseGroupLoading,
+    error: expenseGroupError,
+  } = useSWR(`/api/expenseGroups/${expenseGroupId}`, apiFetcher);
 
   const {
     data: participantsData,
     isLoading: participantsLoading,
     error: participantsError,
-  } = useSWR(groupId ? `/api/participants?groupId=${groupId}` : null, apiFetcher);
+  } = useSWR(`/api/participants?groupId=${expenseGroupId}`, apiFetcher);
+
   const {
     data: expensesData,
     isLoading: expensesLoading,
     error: expensesError,
-  } = useSWR(groupId ? `/api/expenses?groupId=${groupId}` : null, apiFetcher);
+  } = useSWR(`/api/expenses?groupId=${expenseGroupId}`, apiFetcher);
+
+  useEffect(() => {
+    if (expenseGroupData && expenseGroupData.data) {
+      const { title, note } = expenseGroupData.data;
+      setValue("title", title);
+      setValue("note", note);
+      setExpenseGroup(expenseGroupData.data);
+    }
+  }, [expenseGroupData, setValue]);
 
   // participants and expenses validation
   useEffect(() => {
@@ -110,16 +134,23 @@ export default function GroupForm({ groupId }: GroupFormProps) {
     try {
       await splitExpenseGroup();
 
-      const newGroupData: ExpenseGroup = {
+      // POST to update expense group
+
+      const groupData: ExpenseGroup = {
+        _id: expenseGroupId,
         title,
         note,
         expenses: expenses.map((expense) => expense._id as string),
         participants: participants.map((participant) => participant._id as string),
       };
 
-      const newExpenseGroup = await createExpenseGroup(newGroupData);
+      await updateExpenseGroup(groupData);
       reset();
-      router.push(`/groups/${newExpenseGroup._id}`);
+      router.push(`/groups/${expenseGroupId}`);
+
+      // const newExpenseGroup = await createExpenseGroup(newGroupData);
+      // reset();
+      // router.push(`/groups/${newExpenseGroup._id}`);
 
     } catch (error) {
       console.error("Error submitting expense group", error);
@@ -178,8 +209,6 @@ export default function GroupForm({ groupId }: GroupFormProps) {
     //          => update creditor.balance = 0
     //          => update debtor.balance = 0
 
-    // console.log("Expenses", expenses);
-    // console.log("Participants", participants);
 
     const creditors = participants
       .filter((p) => p.balance > 0)
@@ -197,6 +226,15 @@ export default function GroupForm({ groupId }: GroupFormProps) {
       0
     );
 
+    console.log("creditors", creditors);
+    console.log("debtors", debtors);
+
+    console.log("creditorsTotal", creditorsTotal);
+    console.log("debtorsTotal", debtorsTotal);
+
+    // Need to give a small tolerance for floating point errors
+    // const tolerance = 0.01;
+    // if (Math.abs(creditorsTotal + debtorsTotal) > tolerance) {
     const netBalance = creditorsTotal + debtorsTotal;
 
     if (netBalance !== 0) {
@@ -248,7 +286,7 @@ export default function GroupForm({ groupId }: GroupFormProps) {
   return (
     <Flex align="center" direction="column" flex="1">
       <Heading py={6} textStyle="2xl">
-        New Expense Group
+        {expenseGroup.title || "New Expense Group"}
       </Heading>
       <form
         onSubmit={handleSubmit(onSubmit)}
@@ -295,8 +333,7 @@ export default function GroupForm({ groupId }: GroupFormProps) {
                       p="0"
                       minW="auto"
                       onClick={() => {
-                        const participantId = groupId ? participant._id : participant.localId;
-                        handleUpdateParticipant(participantId as string);
+                        handleUpdateParticipant(participant._id as string);
                       }}
                     >
                       <Avatar.Root
@@ -424,14 +461,14 @@ export default function GroupForm({ groupId }: GroupFormProps) {
 
       {openParticipantForm && (
         <ParticipantForm
-          setParticipants={setParticipants}
-          participants={participants}
+          // setParticipants={setParticipants}
+          // participants={participants}
           openParticipantForm={openParticipantForm}
           setOpenParticipantForm={setOpenParticipantForm}
           participantId={selectedParticipantId}
-          setExpenses={setExpenses}
-          expenses={expenses}
-          groupId={groupId}
+          // setExpenses={setExpenses}
+          // expenses={expenses}
+          expenseGroupId={expenseGroupId}
         />
       )}
       {openExpenseForm && (
@@ -441,6 +478,7 @@ export default function GroupForm({ groupId }: GroupFormProps) {
           setOpenExpenseForm={setOpenExpenseForm}
           expenseId={selectedExpenseId}
           participants={participants}
+          expenseGroupId={expenseGroupId}
         // setParticipants={setParticipants}
         />
       )}

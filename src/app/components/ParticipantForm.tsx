@@ -38,23 +38,35 @@ import {
 } from "@/utils/participantsApi";
 
 import { deleteExpense, getExpenseById, updateExpense } from "@/utils/expensesApi";
+// import { v4 as uuidv4 } from 'uuid';
 
 import {
   Participant,
   ExpenseDetail,
   PaymentDetail,
+  Expense
 } from "@/app/types/interfaces";
 
 interface ParticipantFormProps {
+  // setParticipants: React.Dispatch<React.SetStateAction<Participant[]>>;
+  // participants: Participant[];
   openParticipantForm: boolean;
   setOpenParticipantForm: React.Dispatch<React.SetStateAction<boolean>>;
   participantId: string | null;
+  // setExpenses: React.Dispatch<React.SetStateAction<Expense[]>>;
+  // expenses: Expense[];
+  expenseGroupId: string;
 }
 
 export default function ParticipantForm({
+  // setParticipants,
+  // participants,
   openParticipantForm,
   setOpenParticipantForm,
   participantId,
+  // setExpenses,
+  // expenses,
+  expenseGroupId,
 }: ParticipantFormProps) {
   const {
     data: participantData,
@@ -91,14 +103,24 @@ export default function ParticipantForm({
   if (error) return <div>Failed to load participant</div>;
 
   const onSubmit: SubmitHandler<Participant> = async (data) => {
-    console.log("2. SUBMIT PARTICIPANT");
+    console.log("2. SUBMIT PARTICIPANT", data);
 
     // update participant
     if (participant) {
       try {
         const { firstName, lastName } = data;
         const updateData = { ...participant, firstName, lastName };
+
         await updateParticipant(updateData);
+
+        // if (groupId) {
+        //   await updateParticipant(updateData);
+        // } else {
+        //   const updatedParticipants = participants.map((p) =>
+        //     p._id === participant._id ? updateData : p
+        //   );
+        //   setParticipants(updatedParticipants);
+        // }
       } catch (error) {
         console.error("Error updating participant", error);
       }
@@ -114,15 +136,26 @@ export default function ParticipantForm({
           paidTotal: 0,
           splitTotal: 0,
           transactions: [],
+          expenseGroupId,
         };
         console.log("New participant data", newParticipantData);
+
         await createParticipant(newParticipantData);
+
+        // if (groupId) {
+        //   newParticipantData.expenseGroupId = groupId;
+        //   await createParticipant(newParticipantData);
+        // } else {
+        //   newParticipantData.localId = uuidv4();
+        //   setParticipants((prev) => [...prev, newParticipantData]);
+        // }
+
       } catch (error) {
         console.error("Error creating participant", error);
       }
     }
 
-    mutate("/api/participants");
+    mutate(`/api/participants?groupId=${expenseGroupId}`);
 
     reset();
     setOpenParticipantForm(false);
@@ -146,27 +179,40 @@ export default function ParticipantForm({
     try {
       const paidExpenses = participant.paidExpenses;
       for (let i = 0; i < paidExpenses.length; i++) {
-        // const paidExpense = expenses.find(
-        //   (e) => e._id === paidExpenses[i].expenseId
-        // );
-        // if (!paidExpense) {
-        //   throw Error(`Expense ${paidExpenses[i].expenseId} cannot be found!`);
+        const paidExpense: Expense = await getExpenseById(paidExpenses[i].expenseId);
+
+        // if (groupId) {
+        //   paidExpense = await getExpenseById(paidExpenses[i].expenseId);
+        // } else {
+        //   paidExpense = expenses.find(
+        //     (e) => e.localId === paidExpenses[i].expenseId
+        //   );
+        //   if (!paidExpense) {
+        //     throw Error(`Expense ${paidExpenses[i].expenseId} cannot be found!`);
+        //   }
         // }
-        const paidExpense = await getExpenseById(paidExpenses[i].expenseId);
 
         const splitParticipants = paidExpense.splitBy;
         for (let j = 0; j < splitParticipants.length; j++) {
-          // const splitParticipant = participants.find(
-          //   (p) => p._id === splitParticipants[j].participantId
-          // );
-
-          // if (!splitParticipant)
-          //   throw Error(
-          //     `Split participant ${splitParticipants[i].participantId} cannot be found!`
-          //   );
-          const splitParticipant = await getParticipantById(
+          const splitParticipant: Participant = await getParticipantById(
             splitParticipants[j].participantId
           );
+
+          // if (groupId) {
+          //   splitParticipant = await getParticipantById(
+          //     splitParticipants[j].participantId
+          //   );
+
+          // } else {
+          //   splitParticipant = participants.find(
+          //     (p) => p.localId === splitParticipants[j].participantId
+          //   );
+
+          //   if (!splitParticipant)
+          //     throw Error(
+          //       `Split participant ${splitParticipants[i].participantId} cannot be found!`
+          //     );
+          // }
 
           const updatedSplitExpenses = splitParticipant.splitExpenses.filter(
             (se: ExpenseDetail) => se.expenseId !== paidExpense._id
@@ -180,14 +226,26 @@ export default function ParticipantForm({
           splitParticipant.balance =
             splitParticipant.paidTotal - splitParticipant.splitTotal;
 
-          // const updatedParticipants = participants.map((p) =>
-          //   p._id === splitParticipant._id ? splitParticipant : p
-          // );
-          // setParticipants(updatedParticipants);
           await updateParticipant(splitParticipant);
+
+          // if (groupId) {
+          //   await updateParticipant(splitParticipant);
+          // } else {
+          //   const updatedParticipants = participants.map((p) => {
+          //     return p.localId === splitParticipant.localId ? splitParticipant : p
+          //   }
+          //   );
+          //   setParticipants(updatedParticipants);
+          // }
         }
-        // setExpenses((prev) => prev.filter((e) => e._id !== paidExpense._id));
+
         await updateExpense(paidExpense);
+
+        // if (groupId) {
+        //   await updateExpense(paidExpense);
+        // } else {
+        //   setExpenses((prev) => prev.filter((e) => e.localId !== paidExpense.localId));
+        // }
       }
 
       const splitExpenses = participant.splitExpenses;
@@ -266,8 +324,8 @@ export default function ParticipantForm({
     } catch (error) {
       console.error("Error deleting participant", error);
     }
-    mutate("/api/participants");
-    mutate("/api/expenses");
+    mutate(`/api/participants/${expenseGroupId}`);
+    mutate(`/api/expenses/${expenseGroupId}`);
     reset();
     setOpenParticipantForm(false);
   };

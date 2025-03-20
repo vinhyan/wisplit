@@ -4,20 +4,21 @@ import { NextRequest, NextResponse } from "next/server";
 // import { logger } from "@/utils/logger";
 
 export async function GET(req: NextRequest) {
-  console.log("GET all expenses");
+  console.log("GET all expenses from a group expense");
   try {
     await dbConnect();
     const { searchParams } = new URL(req.url);
-    const ids = searchParams.get("ids");
-    let expenses;
-    if (!ids) {
-       expenses = await ExpenseModel.find({});
-    } else {
-      const expenseIds = ids.split(",");
-      expenses = await ExpenseModel.find({
-        _id: { $in: expenseIds },
-      });
+    const groupId = searchParams.get("groupId");
+
+    if (!groupId) {
+      console.error("No group ID provided");
+      return NextResponse.json({ success: false }, { status: 404 });
     }
+
+    const expenses = await ExpenseModel.find({
+      expenseGroupId: { $in: groupId },
+    });
+
     return NextResponse.json({ success: true, data: expenses });
   } catch (error) {
     console.error(error);
