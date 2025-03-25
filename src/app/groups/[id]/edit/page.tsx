@@ -73,7 +73,7 @@ export default function GroupEdit() {
 
   const {
     data: participantsData,
-    isLoading: participantsLoading,
+    // isLoading: participantsLoading,
     // error: participantsError,
   } = useSWR(`/api/participants?groupId=${expenseGroupId}`, apiFetcher);
 
