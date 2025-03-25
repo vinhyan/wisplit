@@ -67,7 +67,7 @@ export default function GroupEdit() {
 
   const {
     data: expenseGroupData,
-    // isLoading: expenseGroupLoading,
+    isLoading: expenseGroupLoading,
     // error: expenseGroupError,
   } = useSWR(`/api/expenseGroups/${expenseGroupId}`, apiFetcher);
 
@@ -337,7 +337,7 @@ export default function GroupEdit() {
               flexWrap={"wrap"}
               width="full"
             >
-              {participantsLoading ? (
+              {expenseGroupLoading ? (
                 <>
                   <SkeletonCircle variant="pulse" size="12" />
                   <SkeletonCircle variant="pulse" size="12" />
