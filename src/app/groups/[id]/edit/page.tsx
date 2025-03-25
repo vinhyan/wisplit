@@ -67,8 +67,8 @@ export default function GroupEdit() {
 
   const {
     data: expenseGroupData,
-    isLoading: expenseGroupLoading,
-    error: expenseGroupError,
+    // isLoading: expenseGroupLoading,
+    // error: expenseGroupError,
   } = useSWR(`/api/expenseGroups/${expenseGroupId}`, apiFetcher);
 
   const {
@@ -79,8 +79,8 @@ export default function GroupEdit() {
 
   const {
     data: expensesData,
-    isLoading: expensesLoading,
-    error: expensesError,
+    // isLoading: expensesLoading,
+    // error: expensesError,
   } = useSWR(`/api/expenses?groupId=${expenseGroupId}`, apiFetcher);
 
   useEffect(() => {
@@ -121,9 +121,9 @@ export default function GroupEdit() {
     return <div>Error loading participants</div>;
   }
 
-  if (expensesError) {
-    return <div>Error loading expenses</div>;
-  }
+  // if (expensesError) {
+  //   return <div>Error loading expenses</div>;
+  // }
 
   const onSubmit: SubmitHandler<GroupInput> = async (data) => {
     const { title, note } = data;

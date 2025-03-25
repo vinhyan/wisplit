@@ -17,7 +17,7 @@ import useSWR, { mutate } from "swr";
 import { apiFetcher } from "@/utils/apiFetcher";
 import { updateParticipants } from "@/utils/participantsApi";
 import { useParams, useRouter } from 'next/navigation'
-import { updateParticipantBalance } from "@/utils/updateParticipantBalance";
+// import { updateParticipantBalance } from "@/utils/updateParticipantBalance";
 import { pickPalette } from "@/components/theme";
 
 const defaultGroup: ExpenseGroup = {
@@ -25,6 +25,7 @@ const defaultGroup: ExpenseGroup = {
   note: "",
   participants: [],
   expenses: [],
+  status: "draft",
 }
 
 export default function Group() {
@@ -38,13 +39,13 @@ export default function Group() {
   const {
     data: participantsData,
     isLoading: participantsLoading,
-    error: participantsError,
+    // error: participantsError,
   } = useSWR(`/api/participants?groupId=${expenseGroupId}`, apiFetcher);
 
   const {
     data: expensesData,
     isLoading: expensesLoading,
-    error: expensesError,
+    // error: expensesError,
   } = useSWR(`/api/expenses?groupId=${expenseGroupId}`, apiFetcher);
 
   const [participants, setParticipants] = useState<Participant[]>([]);

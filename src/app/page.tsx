@@ -1,6 +1,6 @@
 "use client";
-import { Text, Link as ChakraLink, Flex } from "@chakra-ui/react";
-import Link from "next/link";
+import { Flex } from "@chakra-ui/react";
+// import Link from "next/link";
 import NewGroupButton from "./components/NewGroupButton";
 
 export default function Home() {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Provider } from "@/components/ui/provider";
-import { Flex, Container } from "@chakra-ui/react";
+import { Flex } from "@chakra-ui/react";
 import NavBar from "./components/NavBar";
 
 export const metadata: Metadata = {

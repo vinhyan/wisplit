@@ -1,7 +1,8 @@
+/* eslint-disable @typescript-eslint/no-empty-interface */
 import { NumberInput as ChakraNumberInput } from "@chakra-ui/react"
 import * as React from "react"
 
-export interface NumberInputProps extends ChakraNumberInput.RootProps {}
+export interface NumberInputProps extends ChakraNumberInput.RootProps { }
 
 export const NumberInputRoot = React.forwardRef<
   HTMLDivElement,
