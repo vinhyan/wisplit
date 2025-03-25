@@ -8,14 +8,14 @@ export default function GroupsPage() {
     <Flex align="center" justify="center" direction="column" flex="1">
       <Flex direction="column" align="center" justify="center">
         <NewGroupButton />
-        <Text m="2">
+        {/* <Text m="2">
           Have an access code?{" "}
           <ChakraLink variant="underline" color="yam.500" asChild>
             <Link href="#" color="yam.500">
               Click here
             </Link>
           </ChakraLink>
-        </Text>
+        </Text> */}
       </Flex>
     </Flex>
   );

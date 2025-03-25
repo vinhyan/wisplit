@@ -81,6 +81,25 @@ export const updateParticipant = async (participantData: Participant) => {
   }
 };
 
+export const updateParticipants = async (participants: Participant[]) => {
+  try {
+    const res = await fetch(apiUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(participants),
+    });
+    const resData = await res.json();
+    if (!resData.success) {
+      throw new Error(`Cannot update participants`);
+    }
+    return resData.data;
+  } catch (error) {
+    console.error(`Error updating participants`, error);
+  }
+};
+
 export const deleteParticipant = async (id: string) => {
   try {
     const res = await fetch(`${apiUrl}/${id}`, { method: "DELETE" });

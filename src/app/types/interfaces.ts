@@ -1,5 +1,6 @@
 export interface ExpenseGroup {
   _id?: string;
+  status: string;
   title: string;
   note: string;
   expenses: string[];
@@ -20,6 +21,7 @@ export interface Participant {
   paidExpenses: ExpenseDetail[];
   splitExpenses: ExpenseDetail[];
   balance: number;
+  netBalance: number;
   paidTotal: number;
   splitTotal: number;
   transactions: Transaction[];

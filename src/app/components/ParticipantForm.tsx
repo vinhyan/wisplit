@@ -133,6 +133,7 @@ export default function ParticipantForm({
           paidExpenses: [],
           splitExpenses: [],
           balance: 0,
+          netBalance: 0,
           paidTotal: 0,
           splitTotal: 0,
           transactions: [],
@@ -223,8 +224,10 @@ export default function ParticipantForm({
             (acc: number, curr: ExpenseDetail) => acc + curr.amount,
             0
           );
-          splitParticipant.balance =
+          splitParticipant.netBalance =
             splitParticipant.paidTotal - splitParticipant.splitTotal;
+
+          splitParticipant.balance = splitParticipant.netBalance;
 
           await updateParticipant(splitParticipant);
 
@@ -304,8 +307,10 @@ export default function ParticipantForm({
             (acc: number, se: ExpenseDetail) => acc + se.amount,
             0
           );
-          splitParticipant.balance =
+          splitParticipant.netBalance =
             splitParticipant.paidTotal - splitParticipant.splitTotal;
+
+          splitParticipant.balance = splitParticipant.netBalance;
 
           // const updatedParticipants = participants.map((p) =>
           //   p._id === splitParticipant._id ? splitParticipant : p

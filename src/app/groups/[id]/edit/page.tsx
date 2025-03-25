@@ -21,15 +21,9 @@ import { pickPalette } from "@/components/theme";
 import useSWR, { mutate } from "swr";
 import { apiFetcher } from "@/utils/apiFetcher";
 import { updateParticipant } from "@/utils/participantsApi";
-import { updateExpenseGroup } from "@/utils/expenseGroupApi";
+import { updateExpenseGroup, deleteExpenseGroup } from "@/utils/expenseGroupApi";
 // import { v4 as uuidv4 } from 'uuid';
-import { useRouter } from 'next/navigation'
-import { useParams } from 'next/navigation'
-
-
-// interface GroupFormProps {
-//   groupId?: string;
-// }
+import { useRouter, useParams } from 'next/navigation';
 
 interface GroupInput {
   title: string;
@@ -55,6 +49,7 @@ export default function GroupEdit() {
   const [openExpenseForm, setOpenExpenseForm] = useState(false);
 
   const [expenseGroup, setExpenseGroup] = useState<ExpenseGroup>({
+    status: "draft",
     title: "",
     note: "",
     participants: [],
@@ -111,8 +106,10 @@ export default function GroupEdit() {
     console.log("participantsData", participantsData);
     if (participantsData) {
       setParticipants(participantsData.data);
+
     }
   }, [participantsData]);
+  console.log("participants state updated:", participants);
 
   useEffect(() => {
     if (expensesData) {
@@ -133,11 +130,9 @@ export default function GroupEdit() {
 
     try {
       await splitExpenseGroup();
-
-      // POST to update expense group
-
       const groupData: ExpenseGroup = {
         _id: expenseGroupId,
+        status: "completed",
         title,
         note,
         expenses: expenses.map((expense) => expense._id as string),
@@ -147,10 +142,6 @@ export default function GroupEdit() {
       await updateExpenseGroup(groupData);
       reset();
       router.push(`/groups/${expenseGroupId}`);
-
-      // const newExpenseGroup = await createExpenseGroup(newGroupData);
-      // reset();
-      // router.push(`/groups/${newExpenseGroup._id}`);
 
     } catch (error) {
       console.error("Error submitting expense group", error);
@@ -176,6 +167,16 @@ export default function GroupEdit() {
     setSelectedExpenseId(expenseId);
     setOpenExpenseForm(true);
   };
+
+  const handleCancelGroup = async () => {
+    try {
+      await deleteExpenseGroup(expenseGroupId);
+    } catch (error) {
+      console.error("Error deleting expense group", error);
+    }
+    reset();
+    router.push(`/`);
+  }
 
   const splitExpenseGroup = async () => {
     // For each participant:
@@ -209,6 +210,10 @@ export default function GroupEdit() {
     //          => update creditor.balance = 0
     //          => update debtor.balance = 0
 
+    mutate(`/api/participants?groupId=${expenseGroupId}`);
+
+    console.log("participants split func", participants);
+
 
     const creditors = participants
       .filter((p) => p.balance > 0)
@@ -216,6 +221,9 @@ export default function GroupEdit() {
     const debtors = participants
       .filter((p) => p.balance < 0)
       .sort((a, b) => a.balance - b.balance);
+
+    console.log("creditors", creditors);
+    console.log("debtors", debtors);
 
     const creditorsTotal = creditors.reduce(
       (acc: number, curr: Participant) => acc + curr.balance,
@@ -226,19 +234,11 @@ export default function GroupEdit() {
       0
     );
 
-    console.log("creditors", creditors);
-    console.log("debtors", debtors);
+    const validateBalance = parseFloat((creditorsTotal + debtorsTotal).toFixed(2));
 
-    console.log("creditorsTotal", creditorsTotal);
-    console.log("debtorsTotal", debtorsTotal);
-
-    // Need to give a small tolerance for floating point errors
-    // const tolerance = 0.01;
-    // if (Math.abs(creditorsTotal + debtorsTotal) > tolerance) {
-    const netBalance = creditorsTotal + debtorsTotal;
-
-    if (netBalance !== 0) {
-      throw Error("Net balance is not zero!");
+    // allows for tolerance
+    if (Math.abs(validateBalance) > 1) {
+      throw Error("Validate balance is not zero!");
     }
     try {
       let balance = 0;
@@ -247,31 +247,50 @@ export default function GroupEdit() {
         const creditor = creditors[i];
         for (; j < debtors.length; j++) {
           const debtor = debtors[j];
-          balance = creditor.balance + debtor.balance;
-
-          const transaction: Transaction = {
-            recipientId: creditor._id as string,
-            amount: Math.abs(debtor.balance),
-          };
-          debtor.transactions = [...debtor.transactions, transaction];
+          balance = creditor.netBalance + debtor.netBalance;
+          console.log("======================");
+          console.log("creditor", creditor);
+          console.log("debtor", debtor);
+          console.log("balance", balance);
+          console.log("======================");
 
           // debtor is settled
           if (balance > 0) {
-            debtor.balance = 0;
-            creditor.balance = balance;
+            const transaction: Transaction = {
+              recipientId: creditor._id as string,
+              amount: Math.abs(debtor.netBalance),
+            };
+            debtor.transactions = [...debtor.transactions, transaction];
+            debtor.netBalance = 0;
+            creditor.netBalance = balance;
+            console.log("debtor is settled:", debtor);
+            console.log("creditor is not settled:", creditor);
           }
           // creditor is settled
           else if (balance < 0) {
-            debtor.balance = balance;
-            creditor.balance = 0;
+            const transaction: Transaction = {
+              recipientId: creditor._id as string,
+              amount: Math.abs(creditor.netBalance),
+            };
+            debtor.transactions = [...debtor.transactions, transaction];
+            debtor.netBalance = balance;
+            creditor.netBalance = 0;
+            console.log("creditor is settled:", creditor);
+            console.log("debtor is not settled:", debtor);
             await updateParticipant(debtor);
             await updateParticipant(creditor);
             break;
           }
           // both are settled
           else {
-            debtor.balance = 0;
-            creditor.balance = 0;
+            const transaction: Transaction = {
+              recipientId: creditor._id as string,
+              amount: Math.abs(debtor.netBalance),
+            };
+            debtor.transactions = [...debtor.transactions, transaction];
+            console.log("both are settled:", creditor, debtor);
+            debtor.netBalance = 0;
+            creditor.netBalance = 0;
           }
           await updateParticipant(debtor);
           await updateParticipant(creditor);
@@ -280,7 +299,8 @@ export default function GroupEdit() {
     } catch (error) {
       console.error("Error splitting expenses", error);
     }
-    mutate("/api/participants");
+    mutate(`/api/participants?groupId=${expenseGroupId}`);
+
   };
 
   return (
@@ -445,17 +465,29 @@ export default function GroupEdit() {
               {errors.expenses && errors.expenses.message}
             </Field.ErrorText>
           </Field.Root>
-          <Button
-            disabled={Object.keys(errors).length > 0}
-            type="submit"
-            bgColor="lime.500"
-            rounded="full"
-            width="100%"
-            maxWidth="150px"
-            loading={isSubmitting}
-          >
-            Split
-          </Button>
+          <Flex gap={6} justify="center">
+            <Button
+              variant="outline"
+              colorPalette="red"
+              rounded="full"
+              width="100%"
+              maxWidth="150px"
+              onClick={handleCancelGroup}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={Object.keys(errors).length > 0}
+              type="submit"
+              bgColor="lime.500"
+              rounded="full"
+              width="100%"
+              maxWidth="150px"
+              loading={isSubmitting}
+            >
+              Split
+            </Button>
+          </Flex>
         </Flex>
       </form>
 

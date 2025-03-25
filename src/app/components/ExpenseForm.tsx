@@ -192,11 +192,12 @@ export default function ExpenseForm({
         (acc: number, curr: ExpenseDetail) => acc + curr.amount,
         0
       );
-      paidParticipant.balance =
+      paidParticipant.netBalance =
         paidParticipant.paidTotal - paidParticipant.splitTotal;
       // setParticipants((prev) =>
       //   prev.map((p) => (p._id === paidParticipant._id ? paidParticipant : p))
       // );
+      paidParticipant.balance = paidParticipant.netBalance;
       await updateParticipant(paidParticipant);
 
       // === split participants ===
@@ -221,12 +222,13 @@ export default function ExpenseForm({
           (acc: number, curr: ExpenseDetail) => acc + curr.amount,
           0
         );
-        splitParticipant.balance =
+        splitParticipant.netBalance =
           splitParticipant.paidTotal - splitParticipant.splitTotal;
 
         // setParticipants((prev) =>
         //   prev.map((p) => (p._id === splitParticipant._id ? splitParticipant : p))
         // );
+        splitParticipant.balance = splitParticipant.netBalance;
         await updateParticipant(splitParticipant);
       }
 
@@ -235,8 +237,8 @@ export default function ExpenseForm({
     } catch (error) {
       console.error(`Error deleting expense`, error);
     }
-    mutate("/api/participants");
-    mutate("/api/expenses");
+    mutate(`/api/participants/${expenseGroupId}`);
+    mutate(`/api/expenses/${expenseGroupId}`);
     reset();
     setOpenExpenseForm(false);
   };
@@ -312,7 +314,8 @@ export default function ExpenseForm({
           (acc: number, curr: PaymentDetail) => acc + curr.amount,
           0
         );
-        paidPerson.balance = paidPerson.paidTotal - paidPerson.splitTotal;
+        paidPerson.netBalance = paidPerson.paidTotal - paidPerson.splitTotal;
+        paidPerson.balance = paidPerson.netBalance;
 
         await updateParticipant(paidPerson);
         // setParticipants((prev) =>
@@ -347,13 +350,14 @@ export default function ExpenseForm({
             (acc: number, curr: PaymentDetail) => acc + curr.amount,
             0
           );
-          splitParticipant.balance =
+          splitParticipant.netBalance =
             splitParticipant.paidTotal - splitParticipant.splitTotal;
           // setParticipants((prev) =>
           //   prev.map((p) =>
           //     p._id === splitParticipant._id ? splitParticipant : p
           //   )
           // );
+          splitParticipant.balance = splitParticipant.netBalance;
           await updateParticipant(splitParticipant);
         }
 
@@ -418,11 +422,12 @@ export default function ExpenseForm({
             (acc: number, curr: ExpenseDetail) => acc + curr.amount,
             0
           );
-          currPaidPerson.balance =
+          currPaidPerson.netBalance =
             currPaidPerson.paidTotal - currPaidPerson.splitTotal;
           // setParticipants((prev) =>
           //   prev.map((p) => (p._id === currPaidPerson._id ? currPaidPerson : p))
           // );
+          currPaidPerson.balance = currPaidPerson.netBalance;
           await updateParticipant(currPaidPerson);
           // mutate("/api/participants");
 
@@ -451,11 +456,12 @@ export default function ExpenseForm({
             (acc: number, curr: ExpenseDetail) => acc + curr.amount,
             0
           );
-          newPaidPerson.balance =
+          newPaidPerson.netBalance =
             newPaidPerson.paidTotal - newPaidPerson.splitTotal;
           // setParticipants((prev) =>
           //   prev.map((p) => (p._id === newPaidPerson._id ? newPaidPerson : p))
           // );
+          newPaidPerson.balance = newPaidPerson.netBalance;
           await updateParticipant(newPaidPerson);
           // mutate("/api/participants");
         }
@@ -470,11 +476,12 @@ export default function ExpenseForm({
             (acc: number, curr: ExpenseDetail) => acc + curr.amount,
             0
           );
-          currPaidPerson.balance =
+          currPaidPerson.netBalance =
             currPaidPerson.paidTotal - currPaidPerson.splitTotal;
           // setParticipants((prev) =>
           //   prev.map((p) => (p._id === currPaidPerson._id ? currPaidPerson : p))
           // );
+          currPaidPerson.balance = currPaidPerson.netBalance;
           await updateParticipant(currPaidPerson);
           // mutate("/api/participants");
         }
@@ -511,13 +518,14 @@ export default function ExpenseForm({
               (acc: number, curr: ExpenseDetail) => acc + curr.amount,
               0
             );
-          prevSplitParticipant.balance =
+          prevSplitParticipant.netBalance =
             prevSplitParticipant.paidTotal - prevSplitParticipant.splitTotal;
           // setParticipants((prev) =>
           //   prev.map((p) =>
           //     p._id === prevSplitParticipant._id ? prevSplitParticipant : p
           //   )
           // );
+          prevSplitParticipant.balance = prevSplitParticipant.netBalance;
           await updateParticipant(prevSplitParticipant);
           // mutate("/api/participants");
         }
@@ -565,13 +573,15 @@ export default function ExpenseForm({
               (acc: number, curr: ExpenseDetail) => acc + curr.amount,
               0
             );
-          newSplitParticipant.balance =
+          newSplitParticipant.netBalance =
             newSplitParticipant.paidTotal - newSplitParticipant.splitTotal;
           // setParticipants((prev) =>
           //   prev.map((p) =>
           //     p._id === newSplitParticipant._id ? newSplitParticipant : p
           //   )
           // );
+          
+          newSplitParticipant.balance = newSplitParticipant.netBalance;
           await updateParticipant(newSplitParticipant);
           // mutate("/api/participants");
         }

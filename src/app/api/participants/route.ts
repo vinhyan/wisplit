@@ -2,6 +2,7 @@ import dbConnect from "../../../lib/mongodb";
 import ParticipantModel from "../../../../models/Participant";
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/utils/logger";
+import { Participant } from "../../types/interfaces";
 
 export async function GET(req: NextRequest) {
   console.log("GET all participants from a group expense");
@@ -28,35 +29,50 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// export async function GET(
-//   req: NextRequest
-//   // { params }: { params: Promise<{ groupId: string }> }
-// ) {
-//   console.log("GET all participants");
+export async function PUT(
+  req: NextRequest
+  // { params }: { params: Promise<{ groupId: string }> }
+) {
+  console.log("PUT multiple participants");
 
-//   try {
-//     await dbConnect();
-//     const { searchParams } = new URL(req.url);
-//     // const { searchParams } = new URL(req.url);
-//     // const ids = searchParams.get("ids");
-//     const groupId = searchParams.get("groupId");
-//     console.log("groupId", groupId);
-//     let participants;
-//     if (!groupId) {
-//       // participants = await ParticipantModel.find({});
-//       throw new Error("No group ID provided");
-//     } else {
-//       // const participantIds = ids.split(",");
-//       participants = await ParticipantModel.find({
-//         $or: [{ expenseGroupId: groupId }, { draftId: groupId }],
-//       });
-//     }
-//     return NextResponse.json({ success: true, data: participants });
-//   } catch (error) {
-//     console.error(error);
-//     return NextResponse.json({ success: false }, { status: 400 });
-//   }
-// }
+  try {
+    await dbConnect();
+    const participantsData = await req.json();
+
+    if (!(Array.isArray(participantsData) || participantsData.length)) {
+      console.error("Invalid or empty participants array");
+      return NextResponse.json({ success: false }, { status: 400 });
+    }
+
+    const bulkOps = participantsData.map((p: Participant) => ({
+      updateOne: {
+        filter: { _id: p._id },
+        update: {
+          $set: {
+            firstName: p.firstName,
+            lastName: p.lastName,
+            paidExpenses: p.paidExpenses,
+            splitExpenses: p.splitExpenses,
+            balance: p.balance,
+            netBalance: p.netBalance,
+            paidTotal: p.paidTotal,
+            splitTotal: p.splitTotal,
+            transactions: p.transactions,
+          },
+        },
+      },
+    }));
+
+    await ParticipantModel.bulkWrite(bulkOps);
+    return NextResponse.json(
+      { success: true, data: participantsData },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ success: false }, { status: 400 });
+  }
+}
 
 export async function POST(req: NextRequest) {
   const log = logger.child({

@@ -47,3 +47,13 @@ export const updateExpenseGroup = async (groupData: ExpenseGroup) => {
     console.error(`Error updating expense group`, error);
   }
 };
+
+export const deleteExpenseGroup = async (id: string) => {
+  try {
+    const res = await fetch(`${apiUrl}/${id}`, { method: "DELETE" });
+    const resData = await res.json();
+    return resData;
+  } catch (error) {
+    console.error(`Error deleting expense group`, error);
+  }
+};

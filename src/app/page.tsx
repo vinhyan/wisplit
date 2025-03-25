@@ -9,10 +9,18 @@ export default function Home() {
       <main>
         <Flex direction="column" align="center" justify="center">
           <NewGroupButton />
-          <Text>or</Text>
-          <ChakraLink asChild variant="underline" color="yam.500">
+          {/* <Text>or</Text> */}
+          {/* <ChakraLink asChild variant="underline" color="yam.500">
             <Link href="#">Log In</Link>
-          </ChakraLink>
+          </ChakraLink> */}
+          <Flex m="2" direction="column" align="center" justify="center">
+            {/* <Text>Have an access code for an expense group?</Text>
+            <ChakraLink variant="underline" color="lime.500" asChild>
+              <Link href="#" >
+                Click here
+              </Link>
+            </ChakraLink> */}
+          </Flex>
         </Flex>
       </main>
     </Flex>

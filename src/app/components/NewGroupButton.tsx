@@ -10,6 +10,7 @@ export default function NewGroupButton() {
     const groupId = objId.toString();
     const expenseGroupData = {
       _id: groupId,
+      status: "draft",
       title: "",
       note: "",
       participants: [],

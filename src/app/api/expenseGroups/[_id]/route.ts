@@ -15,7 +15,10 @@ export async function GET(
       return NextResponse.json({ success: false }, { status: 400 });
     }
 
-    const expenseGroup = await ExpenseGroupModel.findById(_id);
+    const expenseGroup = await ExpenseGroupModel.findOne({
+      _id,
+      status: { $ne: "deleted" },
+    });
 
     if (!expenseGroup) {
       console.error("Cannot find and get expense group with _id", _id);
@@ -55,3 +58,25 @@ export async function PUT(
   }
 }
 
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ _id: string }> }
+) {
+  try {
+    await dbConnect();
+    const { _id } = await params;
+    if (!_id) {
+      console.error("No _id provided");
+      return NextResponse.json({ success: false }, { status: 400 });
+    }
+    const deleteExpenseGroup = await ExpenseGroupModel.findByIdAndDelete(_id);
+    if (!deleteExpenseGroup) {
+      console.error("Cannot find and delete expense group with _id", _id);
+      return NextResponse.json({ success: false }, { status: 400 });
+    }
+    return NextResponse.json({ success: true, data: deleteExpenseGroup });
+  } catch (error) {
+    console.error(`Error deleting expense group`, error);
+    return NextResponse.json({ success: false }, { status: 400 });
+  }
+}
