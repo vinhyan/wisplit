@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-interface */
+/* eslint-disable */
 "use client"
 
 import type { IconButtonProps, SpanProps } from "@chakra-ui/react"

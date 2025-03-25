@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-interface */
+/* eslint-disable */
 import { NumberInput as ChakraNumberInput } from "@chakra-ui/react"
 import * as React from "react"
 
